@@ -1,0 +1,12 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.azure/
+.DS_Store
+Thumbs.db
+*.swp
+articles/.contentlayer/
+openapi_check.json

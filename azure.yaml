@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: inventory-api
+
+metadata:
+  template: inventory-api
+
+infra:
+  provider: bicep
+  path: ./infra
+
+services:
+  inventory-api:
+    host: containerapp
+    project: ./src
+    docker:
+      path: ../Dockerfile
+      context: ..
+    language: python
+
+hooks:
+  postprovision:
+    shell: sh
+    run: |
+      echo ""
+      echo "=========================================="
+      echo "  azd provision 完了。次の手動ステップ:"
+      echo "=========================================="
+      echo "1. scripts/setup.sql を Azure Portal Query Editor で実行"
+      echo "2. APIM → APIs → OpenAPI import → Container Apps の /openapi.json"
+      echo "3. APIM → MCP Servers → Create MCP server"
+      echo "   ⚠️ Diagnostics: Frontend Response payload bytes = 0"
+      echo "4. Foundry → エージェント作成 → MCP ツール接続"
+      echo "5. Foundry → Publish to M365 Copilot (Individual scope)"
+      echo "   ⚠️ publish 後に agent identity の権限付け直し"
+      echo "=========================================="
