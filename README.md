@@ -94,6 +94,7 @@ azd down --purge
 | Foundry connection (PMI) | postprovision | REST API |
 | MCP policy (JWT+rate-limit) | postprovision | MCP Server 存在時のみ |
 | Agent 作成 | postprovision | SDK スクリプト |
+| Agent Application publish | postprovision | REST API（SystemError 時はスキップ） |
 
 ### 手動ステップ（初回のみ）
 
@@ -101,12 +102,31 @@ azd down --purge
 2. **APIM VNet integration 確認** — ポータルで「有効」確認
 3. **Entra App 登録** — `scripts/setup-entra.sh`（初回のみ）
 
-### M365 Copilot への公開
+### M365 Copilot への公開手順
 
-Agent publish と M365 配信は REST API で自動化可能だが、以下は手動:
+Agent Application の publish（stable endpoint 作成）は `postprovision.py` で自動化済み。
+M365 Copilot/Teams への配信は Foundry ポータルから手動で行う:
 
-- **Agent Application 作成** — REST API (`PUT /providers/Microsoft.CognitiveServices/accounts/.../agentApplications/...`) で可能。postprovision.py に追加で実装可能
-- **M365 Copilot/Teams への publish** — Foundry ポータルの UI で「Publish to Teams and M365 Copilot」を選択。Bot Service 作成、メタデータ入力が必要
-- **Organization scope 承認** — テナント管理者が M365 Admin Center で承認
+1. **Foundry ポータル** → agent → **Publish** → **Publish to Teams and M365 Copilot**
+2. **Azure Bot Service** → 「Create an Azure Bot Service」を選択
+3. **メタデータ** を入力:
 
-Agent publish の REST API 化は可能だが、M365 配信パッケージの作成はポータル UI に依存する。
+| フィールド | 値の例 |
+|-----------|--------|
+| Name | 在庫管理アシスタント |
+| Short description | MCP ツールで在庫データを照会する AI アシスタント |
+| Full description | APIM MCP 経由で在庫 REST API を呼び出し、SKU 検索・カテゴリ絞り込み・発注点割れ確認に対応。Foundry Agent + Entra JWT 認証 |
+| Publisher information | Contoso Inc. |
+| Website | https://contoso.com |
+| Privacy statement URL | https://contoso.com/privacy |
+| Terms of use URL | https://contoso.com/terms |
+
+4. **Prepare Agent** → パッケージ作成（1-2分）
+5. **Scope 選択**:
+   - **Individual scope** — 承認不要、自分のみ。テスト用
+   - **Organization scope** — テナント管理者の承認が必要。本番用
+6. **Organization scope の場合**: M365 Admin Center → Requests で承認
+
+publish 後の注意:
+- agent identity が分離される。MCP ツールの APIM 認証に影響する場合がある
+- PMI（ProjectManagedIdentity）経路なら publish 後も同じ identity が使われるため影響なし

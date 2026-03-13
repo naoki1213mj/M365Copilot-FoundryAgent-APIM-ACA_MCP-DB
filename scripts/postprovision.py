@@ -342,6 +342,67 @@ def main() -> None:
     else:
         print("  スキップ")
 
+    # --- 8. Agent Application publish ---
+    print("\n[8/8] Agent Application publish")
+    agent_name = "inventory-ent-pmi"
+    if foundry_name:
+        app_url = (
+            f"https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}"
+            f"/providers/Microsoft.CognitiveServices/accounts/{foundry_name}"
+            f"/projects/inventory-project/applications/{agent_name}"
+            f"?api-version=2025-10-01-preview"
+        )
+        app_body = {
+            "properties": {
+                "agents": [{"agentName": agent_name}],
+            }
+        }
+        app_file = "app-publish.json"
+        with open(app_file, "w") as f:
+            json.dump(app_body, f)
+        result_text = run(
+            f'az rest --method put --url "{app_url}" '
+            f'--headers "Content-Type=application/json" '
+            f'--body "@{app_file}" --query name -o tsv',
+            check=False,
+        )
+        if os.path.exists(app_file):
+            os.remove(app_file)
+        if result_text:
+            print(f"  Agent Application 公開完了: {result_text}")
+            # Deployment 作成
+            deploy_url = (
+                f"https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}"
+                f"/providers/Microsoft.CognitiveServices/accounts/{foundry_name}"
+                f"/projects/inventory-project/applications/{agent_name}"
+                f"/agentdeployments/default?api-version=2025-10-01-preview"
+            )
+            deploy_body = {
+                "properties": {
+                    "deploymentType": "Managed",
+                    "agents": [{"agentName": agent_name}],
+                }
+            }
+            deploy_file = "deploy-publish.json"
+            with open(deploy_file, "w") as f:
+                json.dump(deploy_body, f)
+            run(
+                f'az rest --method put --url "{deploy_url}" '
+                f'--headers "Content-Type=application/json" '
+                f'--body "@{deploy_file}" -o none',
+                check=False,
+            )
+            if os.path.exists(deploy_file):
+                os.remove(deploy_file)
+            print("  Deployment 作成完了")
+        else:
+            print(
+                "  Agent Application の自動 publish はスキップ（REST API SystemError）"
+            )
+            print("  → Foundry ポータルで手動 publish してください")
+    else:
+        print("  スキップ")
+
     # --- 完了 ---
     print("\n" + "=" * 50)
     print("  セットアップ完了")
@@ -349,7 +410,8 @@ def main() -> None:
     print("残りの手動ステップ:")
     print("  1. APIM -> MCP Servers -> Create MCP server（初回のみ）")
     print("  2. APIM ポータル -> Network -> 送信 -> VNet integration 有効化確認")
-    print("  3. M365 Copilot publish（オプション）")
+    print("  3. Foundry ポータルで Publish to Teams & M365 Copilot")
+    print("  4. M365 Admin Center で Organization scope 承認（オプション）")
     print("=" * 50)
 
 
