@@ -113,9 +113,9 @@ M365 Copilot/Teams への配信は Foundry ポータルから手動で行う:
 
 | フィールド | 値の例 |
 |-----------|--------|
-| Name | 在庫管理アシスタント |
-| Short description | MCP ツールで在庫データを照会する AI アシスタント |
-| Full description | APIM MCP 経由で在庫 REST API を呼び出し、SKU 検索・カテゴリ絞り込み・発注点割れ確認に対応。Foundry Agent + Entra JWT 認証 |
+| Name | Inventory Assistant |
+| Short description | AI assistant that queries inventory data via MCP tools |
+| Full description | Calls inventory REST API through APIM MCP, supporting SKU search, category filtering, and reorder point alerts. Powered by Foundry Agent with Entra JWT auth |
 | Publisher information | Contoso Inc. |
 | Website | https://contoso.com |
 | Privacy statement URL | https://contoso.com/privacy |
