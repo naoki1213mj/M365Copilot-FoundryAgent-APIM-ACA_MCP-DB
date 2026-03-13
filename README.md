@@ -75,18 +75,38 @@ npm install && npx zenn preview
 ## Cleanup
 
 ```bash
-azd down
+azd down --purge
 ```
 
-## Foundry Agent の作成メモ
+## 自動化の範囲
 
-`scripts/create_agent.py` は `MCP_PROJECT_CONNECTION_ID` を渡すと、Foundry の project connection 経由で Entra JWT を送る構成になります（キーレス）。fallback として `APIM_SUBSCRIPTION_KEY` / `MCP_HEADERS_JSON` も使えます。
+`azd up` で以下が自動実行される:
 
-```bash
-# 推奨: project_connection_id（キーレス Entra JWT）
-$env:FOUNDRY_PROJECT_ENDPOINT="https://foundry-inventory-demo.services.ai.azure.com/api/projects/inventory-project"
-$env:AGENT_NAME="inventory-v6-pmi"
-$env:MCP_SERVER_URL="https://apim-<name>.azure-api.net/inventory-mcp/mcp"
-$env:MCP_PROJECT_CONNECTION_ID="inventory-mcp-connection"
-python scripts/create_agent.py
-```
+| ステップ | 方法 | 備考 |
+|---------|------|------|
+| インフラ全体 | Bicep | VNet, SQL, ACR, CA, APIM, KV, Defender, Foundry |
+| モデルデプロイ (4種) | Bicep | gpt-4.1-mini, gpt-4.1, gpt-5-mini, gpt-5.2 |
+| コンテナビルド＆デプロイ | azd deploy | ACR Tasks リモートビルド |
+| Foundry project | postprovision | CLI（Bicep 未対応） |
+| Private DNS Zone | postprovision | internal CAE 用 |
+| SQL データ投入 + MI 権限 | postprovision | 一時的に public access ON→OFF |
+| APIM REST API import | postprovision | OpenAPI spec 自動生成 |
+| Foundry connection (PMI) | postprovision | REST API |
+| MCP policy (JWT+rate-limit) | postprovision | MCP Server 存在時のみ |
+| Agent 作成 | postprovision | SDK スクリプト |
+
+### 手動ステップ（初回のみ）
+
+1. **APIM MCP Server 作成** — ポータル必須（ARM API 未対応）
+2. **APIM VNet integration 確認** — ポータルで「有効」確認
+3. **Entra App 登録** — `scripts/setup-entra.sh`（初回のみ）
+
+### M365 Copilot への公開
+
+Agent publish と M365 配信は REST API で自動化可能だが、以下は手動:
+
+- **Agent Application 作成** — REST API (`PUT /providers/Microsoft.CognitiveServices/accounts/.../agentApplications/...`) で可能。postprovision.py に追加で実装可能
+- **M365 Copilot/Teams への publish** — Foundry ポータルの UI で「Publish to Teams and M365 Copilot」を選択。Bot Service 作成、メタデータ入力が必要
+- **Organization scope 承認** — テナント管理者が M365 Admin Center で承認
+
+Agent publish の REST API 化は可能だが、M365 配信パッケージの作成はポータル UI に依存する。
