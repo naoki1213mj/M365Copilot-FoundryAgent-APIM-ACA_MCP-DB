@@ -59,6 +59,8 @@ articles/                ← Zenn 記事
 | workload profiles 環境 | consumption-only 環境 | PE/UDR 不可。作成後変更不可 |
 | publish 後に agent identity に権限付与 | project identity のまま放置 | 分離後は別 identity |
 | Individual scope（デモ） | Organization scope（デモ） | admin 承認不要で即時利用 |
+| internal CAE + `external: true` | internal CAE + `external: false` | false だと CA Environment 内のみ。APIM から 404 |
+| NSG source: `VirtualNetwork` | NSG source: サブネット CIDR | APIM VNet integration の outbound IP が特定サブネットとは限らない |
 
 ## 変更の規律
 

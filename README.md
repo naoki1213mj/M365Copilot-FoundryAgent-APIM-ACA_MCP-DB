@@ -18,18 +18,17 @@ azd up
 
 ```text
 デモ:  Foundry → APIM (public) → Container Apps (public) → SQL (public)
-本番:  Foundry → APIM (VNet out) → Container Apps (internal/PE) → SQL (PE) + KV + Defender
+本番:  Foundry → APIM (VNet integration) → Container Apps (internal CAE, VNet-scope ingress) → SQL (PE only)
+       + VNet + NSG + Key Vault + Defender + Managed Identity
 ```
 
 Container Apps に MCP 実装なし。APIM が REST → MCP 変換。
+internal CAE では ingress.external = true が「VNet scope」を意味する（インターネットには出ない）。
 
 ## M365 Publish Note
 
-- 2026-03 時点の検証では、M365 Copilot / Teams への公開は Organization scope で正常動作を確認。
-- Individual scope は Foundry 側の publish 挙動が不安定で、Channels application は作成されても deployment が正しく切り替わらず応答できないケースがあった。
-- MCP ツール付き agent も、MCP なし agent も同じ傾向だったため、M365 配布デモは Organization scope 前提で扱う。
-- 2026-03-13 の切り分けでは、旧 APIM `apim-pklmdvehtuixu` の MCP ランタイムが壊れ、`/mcp` が空応答になる事象を確認。新しい APIM `apim-pklmdvehtuiv2` へ REST API と MCP server を再作成し、`inventory-v4` の Foundry / M365 Copilot 動作を確認した。
-- 同日、`project_connection_id`（ProjectManagedIdentity）+ APIM `validate-azure-ad-token`（audience 検証）の構成で `inventory-v6-pmi` を作成し、Foundry playground → M365 Copilot publish（Organization scope）→ Teams テストまで、キーレス Entra JWT で end-to-end 成功を確認した。
+- M365 Copilot / Teams への公開は Organization scope で正常動作を確認
+- `project_connection_id`（ProjectManagedIdentity）+ APIM `validate-azure-ad-token` でキーレス Entra JWT 認証
 
 ## Sample Data Note
 
@@ -40,19 +39,32 @@ Container Apps に MCP 実装なし。APIM が REST → MCP 変換。
 
 `enableEnterpriseSecurity=true` で有効化:
 
-- VNet + 4 サブネット + NSG（snet-apim → snet-ca → snet-sql の一方通行）
-- Private Endpoint（SQL, Key Vault）+ Private DNS zone group
-- Managed Identity（Container Apps → SQL、ACR pull。シークレットレス）
+- VNet + 4 サブネット + NSG（VirtualNetwork タグで VNet 内通信許可 + DenyAllInbound）
+- Container Apps: internal CAE + external ingress = VNet-scope（インターネット非公開）
+- Private Endpoint: SQL, Key Vault（public access disabled）
+- Managed Identity: Container Apps → SQL、ACR pull（シークレットレス）
+- APIM Standard v2: VNet outbound integration（`virtualNetworkType: External`）
 - Key Vault（RBAC, soft delete, PE）
 - Defender for Cloud（SQL, Containers, Key Vault）
-- APIM: diagnostics は維持する。MCP API には `validate-azure-ad-token`（audience 検証）を適用し、Foundry 側は `project_connection_id`（ProjectManagedIdentity）経由で Entra JWT を送る構成が正式パス。custom header 認証は fallback として残す
-- Observability: Container Apps → Log Analytics、APIM → Application Insights、API アプリ → Application Insights(OpenTelemetry)
+- MCP API: `validate-azure-ad-token` + `rate-limit-by-key`（IP ベース 60/min）
+- Observability: Container Apps → Log Analytics、APIM → Application Insights
 
-Enterprise mode の追加手順:
+enterprise mode の `azd up` 後の手動ステップ:
 
-- Foundry / Bot の client app id を `APIM_ALLOWED_CLIENT_APP_IDS` に設定して `azd provision`
-- M365 公開後に agent identity へ `MCP.Tools.Read` を割り当てる
-- enterprise 設定を戻すときは、先に REST API と MCP server の疎通を確認し、その後で diagnostics と policy を段階適用する。MCP では Frontend Response payload bytes を 0 のまま維持し、`context.Response.Body` を読む policy は入れない。2026-03-13 に `project_connection_id`（ProjectManagedIdentity）+ APIM MCP API の `validate-azure-ad-token`（audience 検証のみ）で `inventory-v6-pmi` の end-to-end 成功を確認した。ヘッダーなし direct access は `401` で拒否される。`rate-limit-by-key` は引き続き HTTP 500 を再現するため保留、`validate-azure-ad-token` を APIM service 全体に入れると MCP の内部 tool call が 401 になる問題も残る。
+1. APIM → APIs → OpenAPI import → Container Apps の `/openapi.json`
+2. APIM → MCP Servers → Create MCP server
+3. `scripts/apply-mcp-policy.sh` で JWT + rate-limit policy を適用
+4. Private DNS Zone を CAE default domain で作成（`*` と `@` の A レコード → static IP）
+5. Foundry → エージェント作成 → MCP ツール接続
+6. Foundry → Publish to M365 Copilot (Organization scope 推奨)
+
+### ハマりポイント
+
+- internal CAE で `ingress.external: false` にすると **CA Environment 内からのみ**到達可能。APIM からは 404 になる
+- NSG で APIM subnet (10.0.1.0/24) を source にしても不十分。APIM VNet integration の outbound IP は VirtualNetwork タグで広く許可する
+- APIM Standard v2 の Bicep は `virtualNetworkType: 'External'` + `virtualNetworkConfiguration.subnetResourceId`
+- Frontend Response payload bytes = 0 を維持（MCP SSE が不安定になる）
+- `validate-azure-ad-token` は MCP API スコープのみに入れる（service 全体に入れると MCP 内部 tool call が 401）
 
 ## Zenn 記事
 
