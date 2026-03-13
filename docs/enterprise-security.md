@@ -49,7 +49,7 @@
 1. 新しい APIM で REST API の 200 応答を確認する。
 1. MCP server を作成し、`tools/list` が空でないことを確認する。
 1. diagnostics を追加する場合は Frontend Response payload bytes を 0 に固定する。
-1. Foundry project に RemoteTool connection（ProjectManagedIdentity、audience = `api://6740e053-3f54-42be-8d3f-3001b1dad3bc`）を作成し、agent 側で `project_connection_id` を指定する。APIM MCP API には `validate-azure-ad-token`（audience 検証のみ）を入れる。2026-03-13 の `inventory-v6-pmi` で end-to-end 成功を確認した。
+1. Foundry project に RemoteTool connection（ProjectManagedIdentity、audience = `api://{{ENTRA_APP_CLIENT_ID}}`）を作成し、agent 側で `project_connection_id` を指定する。APIM MCP API には `validate-azure-ad-token`（audience 検証のみ）を入れる。
 1. custom header 認証は fallback としてのみ使う。
 1. `validate-azure-ad-token` を APIM service 全体に入れると MCP の内部 tool call が 401 になるため、JWT 検証は MCP API スコープのみにする。
 1. `rate-limit-by-key` は counter-key に `context.Request.IpAddress` を使う。Authorization ヘッダー expression を counter-key にすると HTTP 500 になる。

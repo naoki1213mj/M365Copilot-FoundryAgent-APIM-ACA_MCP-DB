@@ -1,132 +1,167 @@
-# inventory-api
+# Inventory Agent — Foundry + APIM MCP + M365 Copilot
 
-Foundry エージェントが APIM (MCP) 経由で在庫を参照し、M365 Copilot で動くデモ。
-`enableEnterpriseSecurity=true` でエンプラ本番構成（VNet, PE, KV, Defender, MI）に切り替え可能。
+Foundry エージェントが APIM (MCP Server) 経由で在庫 REST API を参照し、M365 Copilot / Teams で動くデモ。
+`enableEnterpriseSecurity=true` でエンタープライズ本番構成（VNet, PE, KV, Defender, MI）に切り替え可能。
+
+## Architecture
+
+### 論理アーキテクチャ
+
+```mermaid
+graph LR
+    User["👤 M365 Copilot / Teams"] --> Foundry["🤖 Foundry Agent<br/>(gpt-5-mini)"]
+    Foundry -->|MCP Protocol<br/>Entra JWT| APIM["🔷 APIM<br/>(MCP Server)"]
+    APIM -->|REST API| CA["📦 Container Apps<br/>(FastAPI)"]
+    CA -->|Managed Identity| SQL["🗃️ Azure SQL<br/>(在庫データ)"]
+```
+
+### Enterprise ネットワーク構成
+
+```mermaid
+graph TB
+    subgraph Internet
+        User["👤 M365 Copilot"]
+        Foundry["🤖 Foundry Agent"]
+    end
+    subgraph VNet["VNet (10.0.0.0/16)"]
+        subgraph snet-apim["snet-apim (10.0.1.0/24)"]
+            APIM["APIM Standard v2<br/>VNet outbound integration"]
+        end
+        subgraph snet-ca["snet-ca (10.0.2.0/23)"]
+            CAE["Container Apps Environment<br/>(internal)"]
+            CA["inventory-api-ent<br/>ingress: VNet scope"]
+        end
+        subgraph snet-sql["snet-sql (10.0.4.0/24)"]
+            SQLPE["SQL Private Endpoint"]
+        end
+        subgraph snet-pe["snet-pe (10.0.5.0/24)"]
+            KVPE["Key Vault PE"]
+        end
+    end
+    SQL["Azure SQL"] --- SQLPE
+    KV["Key Vault"] --- KVPE
+
+    User --> Foundry
+    Foundry -->|Entra JWT| APIM
+    APIM -->|HTTPS 443| CA
+    CA -->|MI auth| SQLPE
+    NSG["NSG: VirtualNetwork Allow<br/>DenyAllInbound"] -.-> snet-ca
+```
 
 ## Quick Start
 
 ```bash
 # デモ（public 構成）
-azd auth login && azd up
+azd auth login
+azd up
 
 # 本番（VNet + Private Endpoint + Key Vault + Defender + Managed Identity）
 azd env set ENABLE_ENTERPRISE_SECURITY true
 azd up
-```
 
-## Architecture
+# ローカル開発
+cd src && uv pip install -r requirements.txt
+uvicorn main:app --reload   # → http://localhost:8000/docs
 
-```text
-デモ:  Foundry → APIM (public) → Container Apps (public) → SQL (public)
-本番:  Foundry → APIM (VNet integration) → Container Apps (internal CAE, VNet-scope ingress) → SQL (PE only)
-       + VNet + NSG + Key Vault + Defender + Managed Identity
-```
+# テスト
+curl http://localhost:8000/health
+curl http://localhost:8000/inventory/INV-004
 
-Container Apps に MCP 実装なし。APIM が REST → MCP 変換。
-internal CAE では ingress.external = true が「VNet scope」を意味する（インターネットには出ない）。
-
-## M365 Publish Note
-
-- M365 Copilot / Teams への公開は Organization scope で正常動作を確認
-- `project_connection_id`（ProjectManagedIdentity）+ APIM `validate-azure-ad-token` でキーレス Entra JWT 認証
-
-## Sample Data Note
-
-- `scripts/setup.sql` の商品名は一般名詞ベースのサンプルデータにしており、特定のブランド名や固有商品名は使わない。
-- SQL Server に日本語を正しく投入するため、seed データは Unicode リテラル `N'...'` を使う。
-
-## Enterprise Security (WAF/CAF Zero Trust)
-
-`enableEnterpriseSecurity=true` で有効化:
-
-- VNet + 4 サブネット + NSG（VirtualNetwork タグで VNet 内通信許可 + DenyAllInbound）
-- Container Apps: internal CAE + external ingress = VNet-scope（インターネット非公開）
-- Private Endpoint: SQL, Key Vault（public access disabled）
-- Managed Identity: Container Apps → SQL、ACR pull（シークレットレス）
-- APIM Standard v2: VNet outbound integration（`virtualNetworkType: External`）
-- Key Vault（RBAC, soft delete, PE）
-- Defender for Cloud（SQL, Containers, Key Vault）
-- MCP API: `validate-azure-ad-token` + `rate-limit-by-key`（IP ベース 60/min）
-- Observability: Container Apps → Log Analytics、APIM → Application Insights
-
-enterprise mode の `azd up` 後の手動ステップ:
-
-1. APIM → APIs → OpenAPI import → Container Apps の `/openapi.json`
-2. APIM → MCP Servers → Create MCP server
-3. `scripts/apply-mcp-policy.sh` で JWT + rate-limit policy を適用
-4. Private DNS Zone を CAE default domain で作成（`*` と `@` の A レコード → static IP）
-5. Foundry → エージェント作成 → MCP ツール接続
-6. Foundry → Publish to M365 Copilot (Organization scope 推奨)
-
-### ハマりポイント
-
-- internal CAE で `ingress.external: false` にすると **CA Environment 内からのみ**到達可能。APIM からは 404 になる
-- NSG で APIM subnet (10.0.1.0/24) を source にしても不十分。APIM VNet integration の outbound IP は VirtualNetwork タグで広く許可する
-- APIM Standard v2 の Bicep は `virtualNetworkType: 'External'` + `virtualNetworkConfiguration.subnetResourceId`
-- Frontend Response payload bytes = 0 を維持（MCP SSE が不安定になる）
-- `validate-azure-ad-token` は MCP API スコープのみに入れる（service 全体に入れると MCP 内部 tool call が 401）
-
-## Zenn 記事
-
-```bash
-npm install && npx zenn preview
-```
-
-## Cleanup
-
-```bash
+# クリーンアップ
 azd down --purge
 ```
 
+## `azd up` 後の手動ステップ（初回のみ）
+
+| # | 手順 | 理由 |
+|---|------|------|
+| 1 | APIM → MCP Servers → Create MCP server | ARM API 未対応 |
+| 2 | APIM → Network → VNet integration 有効化確認 | ポータル確認推奨 |
+| 3 | `scripts/setup-entra.sh` で Entra App 登録 | テナント操作 |
+| 4 | Foundry ポータルで M365 Copilot に publish | Bot Service + メタデータ |
+
+MCP Server 作成後に `azd provision` を再実行すると、JWT + rate-limit policy が自動適用される。
+
+## Tech Stack
+
+| レイヤー | 技術 |
+|---------|------|
+| AI | Foundry Agent (gpt-5-mini) + MCP Protocol |
+| API Gateway | APIM Standard v2 (MCP Server, JWT, rate-limit) |
+| Backend | FastAPI / Python 3.12 / uvicorn |
+| Database | Azure SQL (Entra ID Only, Managed Identity) |
+| Container | Container Apps (workload profiles, ACR remote build) |
+| IaC | azd + Bicep |
+| Auth | Entra ID (`validate-azure-ad-token` + ProjectManagedIdentity) |
+
+## Enterprise Security
+
+`enableEnterpriseSecurity=true` で有効化:
+
+- **ネットワーク分離**: VNet + 4 サブネット + NSG (DenyAllInbound)
+- **Container Apps**: internal CAE + VNet-scope ingress（インターネット非公開）
+- **Private Endpoint**: SQL, Key Vault（public access disabled）
+- **認証**: Managed Identity (Container Apps → SQL, ACR pull)、Entra JWT (APIM MCP)
+- **監視**: Application Insights (APIM, CA)、Log Analytics
+- **防御**: Defender for Cloud (SQL, Containers, Key Vault)
+
+詳細は [docs/enterprise-security.md](docs/enterprise-security.md) を参照。
+
 ## 自動化の範囲
 
-`azd up` で以下が自動実行される:
+`azd up` の postprovision hook (`scripts/postprovision.py`) で以下が自動実行される:
 
-| ステップ | 方法 | 備考 |
-|---------|------|------|
-| インフラ全体 | Bicep | VNet, SQL, ACR, CA, APIM, KV, Defender, Foundry |
-| モデルデプロイ (4種) | Bicep | gpt-4.1-mini, gpt-4.1, gpt-5-mini, gpt-5.2 |
-| コンテナビルド＆デプロイ | azd deploy | ACR Tasks リモートビルド |
-| Foundry project | postprovision | CLI（Bicep 未対応） |
-| Private DNS Zone | postprovision | internal CAE 用 |
-| SQL データ投入 + MI 権限 | postprovision | 一時的に public access ON→OFF |
-| APIM REST API import | postprovision | OpenAPI spec 自動生成 |
-| Foundry connection (PMI) | postprovision | REST API |
-| MCP policy (JWT+rate-limit) | postprovision | MCP Server 存在時のみ |
-| Agent 作成 | postprovision | SDK スクリプト |
-| Agent Application publish | postprovision | REST API（SystemError 時はスキップ） |
+1. Foundry project 作成
+2. Private DNS Zone 作成（internal CAE 用）
+3. SQL データ投入 + MI ユーザー権限付与
+4. APIM REST API import（OpenAPI spec 自動生成）
+5. Foundry project connection 作成（ProjectManagedIdentity）
+6. MCP policy 適用（MCP Server 存在時のみ）
+7. Foundry agent 作成（MCP ツール + PMI 認証）
+8. Agent Application publish
 
-### 手動ステップ（初回のみ）
+## M365 Copilot への公開
 
-1. **APIM MCP Server 作成** — ポータル必須（ARM API 未対応）
-2. **APIM VNet integration 確認** — ポータルで「有効」確認
-3. **Entra App 登録** — `scripts/setup-entra.sh`（初回のみ）
+Agent Application の publish は自動化済み。M365 Copilot/Teams への配信は Foundry ポータルから手動:
 
-### M365 Copilot への公開手順
-
-Agent Application の publish（stable endpoint 作成）は `postprovision.py` で自動化済み。
-M365 Copilot/Teams への配信は Foundry ポータルから手動で行う:
-
-1. **Foundry ポータル** → agent → **Publish** → **Publish to Teams and M365 Copilot**
-2. **Azure Bot Service** → 「Create an Azure Bot Service」を選択
-3. **メタデータ** を入力:
+1. Foundry ポータル → agent → **Publish** → **Publish to Teams and M365 Copilot**
+2. Bot Service 作成 → メタデータ入力 → Prepare Agent
+3. Scope: Individual（テスト）or Organization（本番、管理者承認要）
 
 | フィールド | 値の例 |
 |-----------|--------|
 | Name | Inventory Assistant |
 | Short description | AI assistant that queries inventory data via MCP tools |
-| Full description | Calls inventory REST API through APIM MCP, supporting SKU search, category filtering, and reorder point alerts. Powered by Foundry Agent with Entra JWT auth |
-| Publisher information | Contoso Inc. |
-| Website | https://contoso.com |
-| Privacy statement URL | https://contoso.com/privacy |
-| Terms of use URL | https://contoso.com/terms |
+| Full description | Calls inventory REST API through APIM MCP |
+| Publisher | Your Org Name |
+| Website | https://example.com |
+| Privacy / Terms | https://example.com/privacy, https://example.com/terms |
 
-4. **Prepare Agent** → パッケージ作成（1-2分）
-5. **Scope 選択**:
-   - **Individual scope** — 承認不要、自分のみ。テスト用
-   - **Organization scope** — テナント管理者の承認が必要。本番用
-6. **Organization scope の場合**: M365 Admin Center → Requests で承認
+## Project Structure
 
-publish 後の注意:
-- agent identity が分離される。MCP ツールの APIM 認証に影響する場合がある
-- PMI（ProjectManagedIdentity）経路なら publish 後も同じ identity が使われるため影響なし
+```
+src/main.py              ← FastAPI 在庫 REST API
+infra/                   ← Bicep (azd provision)
+  core/                  ← 個別モジュール (SQL, APIM, CA, Foundry, etc.)
+scripts/
+  postprovision.py       ← azd up 後の自動セットアップ
+  create_agent.py        ← Foundry agent 作成
+  test_agent.py          ← Foundry agent テスト
+  setup.sql              ← サンプルデータ 20 件
+  setup-entra.sh         ← Entra ID app registration
+  mcp-policy.json        ← MCP API JWT + rate-limit policy (テンプレート)
+docs/
+  enterprise-security.md ← セキュリティ設計詳細
+```
+
+## ハマりポイント
+
+- internal CAE で `ingress.external: false` → CA Environment 内のみ到達可。APIM から 404
+- NSG source は `VirtualNetwork` タグで許可。サブネット CIDR では不十分
+- APIM `validate-azure-ad-token` は MCP API スコープのみ。service 全体だと内部 tool call が 401
+- APIM Frontend Response payload bytes = 0 を維持（MCP SSE 安定性）
+- M365 publish の Name フィールドは英語のみ（日本語はエラー）
+
+## License
+
+MIT

@@ -255,9 +255,7 @@ def main() -> None:
 
     # --- 5. Foundry project connection ---
     print("\n[5/7] Foundry connection")
-    entra_app_id = os.environ.get(
-        "ENTRA_APP_CLIENT_ID", "6740e053-3f54-42be-8d3f-3001b1dad3bc"
-    )
+    entra_app_id = os.environ.get("ENTRA_APP_CLIENT_ID", "")
     if foundry_name and apim_name:
         conn_url = (
             f"https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}"
@@ -302,12 +300,25 @@ def main() -> None:
                 f"/providers/Microsoft.ApiManagement/service/{apim_name}"
                 f"/apis/inventory-mcp/policies/policy?api-version=2024-05-01"
             )
-            policy_file = os.path.join(os.path.dirname(__file__), "mcp-policy.json")
+            # テンプレートを実際の値に置換
+            policy_template = os.path.join(os.path.dirname(__file__), "mcp-policy.json")
+            tenant_id = run("az account show --query tenantId -o tsv")
+            with open(policy_template, encoding="utf-8") as f:
+                policy_content = f.read()
+            policy_content = policy_content.replace("{{AZURE_TENANT_ID}}", tenant_id)
+            policy_content = policy_content.replace(
+                "{{ENTRA_APP_CLIENT_ID}}", entra_app_id
+            )
+            policy_resolved = "mcp-policy-resolved.json"
+            with open(policy_resolved, "w", encoding="utf-8") as f:
+                f.write(policy_content)
             run(
                 f'az rest --method put --url "{policy_url}" '
                 f'--headers "Content-Type=application/json" '
-                f'--body "@{policy_file}" -o none'
+                f'--body "@{policy_resolved}" -o none'
             )
+            if os.path.exists(policy_resolved):
+                os.remove(policy_resolved)
             print("  適用完了: validate-azure-ad-token + rate-limit-by-key")
         else:
             print("  MCP API 未検出。APIM ポータルで MCP Server を作成してください。")

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-APIM MCP + Foundry + M365 Copilot で在庫参照エージェントを作るデモ。Zenn 記事も同一リポジトリ。
+APIM MCP + Foundry + M365 Copilot で在庫参照エージェントを作るデモ。
 
 ## Setup / Build / Test
 

@@ -1,7 +1,0 @@
-{
-  "name": "inventory-api",
-  "private": true,
-  "dependencies": {
-    "zenn-cli": "latest"
-  }
-}

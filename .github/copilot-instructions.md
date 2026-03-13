@@ -1,9 +1,9 @@
-# Inventory Agent + Zenn 記事プロジェクト
+# Inventory Agent
 
 ## What This Is
 
 Foundry エージェントが APIM (MCP) → Container Apps (REST) → Azure SQL で在庫を参照するデモ。
-M365 Copilot 公開、Entra ID JWT セキュリティまで含む。開発過程を Zenn 記事にする。
+M365 Copilot 公開、Entra ID JWT セキュリティまで含む。
 
 ## Tech Stack
 
@@ -18,20 +18,18 @@ M365 Copilot 公開、Entra ID JWT セキュリティまで含む。開発過程
 - FastAPI: summary / description を丁寧に書く（APIM が MCP tool メタデータに使う）
 - 認証: DefaultAzureCredential。API キー直書き NG
 - コメント/docstring は日本語、変数名は英語
-- Zenn 記事: AI 文体禁止（6 パターン）。「まとめ」で締めない。主観と試行錯誤を残す
 
 ## Project Structure
 
 ```
 src/           → FastAPI 在庫 API
 infra/         → Bicep (azd)
-scripts/       → setup.sql, setup-entra.sh
-articles/      → Zenn 記事
+scripts/       → setup.sql, setup-entra.sh, postprovision.py
 .github/
-  instructions/  → path-specific ルール (4 files)
-  agents/        → inventory / zenn-writer / zenn-reviewer / factchecker
-  skills/        → apim-mcp / m365-publish / enterprise-security / zenn-*
-  prompts/       → add-endpoint / security-review / fix-ai-style / full-review / sns-post
+  instructions/  → path-specific ルール
+  agents/        → inventory
+  skills/        → apim-mcp / m365-publish / enterprise-security
+  prompts/       → add-endpoint / security-review
 ```
 
 ## Key Decisions
@@ -49,7 +47,6 @@ articles/      → Zenn 記事
 - `.github/skills/apim-mcp-setup/SKILL.md` — APIM MCP 設定手順
 - `.github/skills/m365-publish/SKILL.md` — M365 Copilot 公開手順
 - `.github/skills/enterprise-security/SKILL.md` — セキュリティ設計 + チェックリスト
-- `.github/skills/zenn-writing-style/SKILL.md` — AI 文体排除ルール
 
 ## Quick Commands
 
@@ -58,5 +55,4 @@ azd auth login && azd up                              # デモデプロイ
 azd env set ENABLE_ENTERPRISE_SECURITY true && azd up  # 本番デプロイ
 azd down                                               # クリーンアップ
 cd src && uvicorn main:app --reload                    # ローカル
-npm install && npx zenn preview                        # 記事プレビュー
 ```
