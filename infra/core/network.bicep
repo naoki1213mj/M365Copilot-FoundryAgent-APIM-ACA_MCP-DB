@@ -101,7 +101,9 @@ resource nsgApim 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
 }
 
 // --- NSG: Container Apps subnet ---
-// APIM VNet integration からの HTTPS + CA internal 通信 + LB ヘルスプローブを許可
+// VNet 内からの通信を許可（APIM VNet integration + CA 内部通信 + LB ヘルスプローブ）
+// APIM StdV2 の outbound は VNet integration subnet 以外の IP も使う場合があるため
+// VirtualNetwork タグで広く許可する
 resource nsgCa 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
   name: 'nsg-ca-${resourceToken}'
   location: location
@@ -109,16 +111,16 @@ resource nsgCa 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
   properties: {
     securityRules: [
       {
-        name: 'AllowFromApimSubnet'
+        name: 'AllowFromVNet'
         properties: {
           priority: 100
           direction: 'Inbound'
           access: 'Allow'
-          protocol: 'Tcp'
-          sourceAddressPrefix: '10.0.1.0/24'
+          protocol: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
           sourcePortRange: '*'
-          destinationAddressPrefix: '10.0.2.0/23'
-          destinationPortRanges: ['443', '80']
+          destinationAddressPrefix: 'VirtualNetwork'
+          destinationPortRange: '*'
         }
       }
       {
@@ -132,19 +134,6 @@ resource nsgCa 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
           sourcePortRange: '*'
           destinationAddressPrefix: '10.0.2.0/23'
           destinationPortRange: '30000-32767'
-        }
-      }
-      {
-        name: 'AllowCaSubnetInternal'
-        properties: {
-          priority: 120
-          direction: 'Inbound'
-          access: 'Allow'
-          protocol: '*'
-          sourceAddressPrefix: '10.0.2.0/23'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '10.0.2.0/23'
-          destinationPortRange: '*'
         }
       }
       {
