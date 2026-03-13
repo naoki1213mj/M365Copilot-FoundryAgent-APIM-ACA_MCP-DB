@@ -15,26 +15,39 @@ services:
     docker:
       path: ../Dockerfile
       context: ..
+      remoteBuild: true
     language: python
 
 hooks:
   postprovision:
-    shell: sh
+    shell: pwsh
+    continueOnError: true
     run: |
-      echo ""
+      Write-Host ""
       # MCP API が存在すればセキュリティポリシーを適用
-      APIM_NAME=$(az resource list -g "$AZURE_RESOURCE_GROUP" --resource-type Microsoft.ApiManagement/service --query "[0].name" -o tsv 2>/dev/null || true)
-      if [ -n "$APIM_NAME" ]; then
-        bash scripts/apply-mcp-policy.sh "$AZURE_RESOURCE_GROUP" "$APIM_NAME"
-      fi
-      echo ""
-      echo "=========================================="
-      echo "  azd provision 完了。次の手動ステップ:"
-      echo "=========================================="
-      echo "1. scripts/setup.sql を Azure Portal Query Editor で実行"
-      echo "2. APIM → APIs → OpenAPI import → Container Apps の /openapi.json"
-      echo "3. APIM → MCP Servers → Create MCP server"
-      echo "4. Foundry → エージェント作成 → MCP ツール接続"
-      echo "5. Foundry → Publish to M365 Copilot (Organization scope 推奨)"
-      echo "   ⚠️ publish 後に agent identity の権限付け直し"
-      echo "=========================================="
+      $apimName = az resource list -g $env:AZURE_RESOURCE_GROUP --resource-type Microsoft.ApiManagement/service --query "[0].name" -o tsv 2>$null
+      if ($apimName) {
+        $sub = az account show --query id -o tsv
+        $mcpApiId = "inventory-mcp"
+        $policyFile = Join-Path $PSScriptRoot "scripts/mcp-policy.json"
+        $checkUrl = "https://management.azure.com/subscriptions/$sub/resourceGroups/$env:AZURE_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$apimName/apis/$mcpApiId`?api-version=2024-05-01"
+        $null = az rest --method get --url $checkUrl 2>$null
+        if ($LASTEXITCODE -eq 0) {
+          $apiUrl = "https://management.azure.com/subscriptions/$sub/resourceGroups/$env:AZURE_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$apimName/apis/$mcpApiId/policies/policy?api-version=2024-05-01"
+          az rest --method put --url $apiUrl --headers "Content-Type=application/json" --body "@$policyFile"
+          Write-Host "MCP policy applied: validate-azure-ad-token + rate-limit-by-key (IP, 60/min)"
+        } else {
+          Write-Host "MCP API '$mcpApiId' not found. Create MCP Server in APIM portal first."
+        }
+      }
+      Write-Host ""
+      Write-Host "=========================================="
+      Write-Host "  azd provision completed. Next steps:"
+      Write-Host "=========================================="
+      Write-Host "1. scripts/setup.sql を Azure Portal Query Editor で実行"
+      Write-Host "2. APIM -> APIs -> OpenAPI import -> Container Apps の /openapi.json"
+      Write-Host "3. APIM -> MCP Servers -> Create MCP server"
+      Write-Host "4. Foundry -> エージェント作成 -> MCP ツール接続"
+      Write-Host "5. Foundry -> Publish to M365 Copilot (Organization scope 推奨)"
+      Write-Host "   publish 後に agent identity の権限付け直し"
+      Write-Host "=========================================="
