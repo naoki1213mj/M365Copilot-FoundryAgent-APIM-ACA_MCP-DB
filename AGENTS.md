@@ -35,64 +35,40 @@ npx zenn preview                      # → localhost:8000
 azd down
 ```
 
-## Foundry セットアップ（azd up 後の手動ステップ）
+## Foundry セットアップ（azd up で自動実行）
 
-azd up で Azure リソースをデプロイした後、以下の手順で Foundry → Agent → MCP を構築する。
+`azd up` の postprovision hook (`scripts/postprovision.py`) で以下が自動実行される:
+
+1. Foundry project 作成
+2. Private DNS Zone 作成（internal CAE 用）
+3. SQL サンプルデータ投入 + MI ユーザー権限付与
+4. APIM REST API import（OpenAPI spec 自動生成）
+5. Foundry project connection 作成（ProjectManagedIdentity）
+6. MCP policy 適用（MCP Server 存在時のみ）
+7. Foundry agent 作成（MCP ツール + PMI 認証）
+
+### 手動ステップ（初回のみ）
 
 ```bash
-# 1. サンプルデータ投入（SQL に接続できる状態で）
-export SQL_SERVER_FQDN=sql-<token>.database.windows.net
-export SQL_DATABASE_NAME=inventory_db
-python scripts/load_data.py
+# APIM ポータルで MCP Server を作成（ARM API 未対応のため手動）
+# APIM → MCP Servers → Create MCP server
+#   Source API: Inventory API
+#   名前: inventory-mcp
 
-# 2. Container App MI に SQL 権限付与
-python scripts/grant_sql_access.py \
-  --server sql-<token>.database.windows.net \
-  --database inventory_db \
-  --principal-name inventory-api-ent
+# MCP Server 作成後に azd provision を再実行（MCP policy 適用のため）
+azd provision
 
-# 3. APIM ポータルで REST API を OpenAPI import + MCP Server 作成
-#    → MCP Server URL: https://apim-<token>.azure-api.net/inventory-mcp/mcp
-
-# 4. Foundry account + project 作成（CLI）
-az cognitiveservices account create \
-    --name foundry-inventory-demo \
-    --resource-group rg-inventory-demo \
-    --kind AIServices --sku S0 -l japaneast \
-    --custom-domain foundry-inventory-demo \
-    --allow-project-management
-
-az cognitiveservices account project create \
-    --name foundry-inventory-demo \
-    --resource-group rg-inventory-demo \
-    --project-name inventory-project \
-    --location japaneast
-
-# 5. モデルデプロイ
-az cognitiveservices account deployment create \
-    --name foundry-inventory-demo \
-    --resource-group rg-inventory-demo \
-    --deployment-name gpt-4o-mini \
-    --model-name gpt-4o-mini \
-    --model-version "2024-07-18" \
-    --model-format OpenAI \
-    --sku-capacity 10 --sku-name GlobalStandard
-
-# 6. Agent 作成
-export FOUNDRY_PROJECT_ENDPOINT="https://foundry-inventory-demo.services.ai.azure.com/api/projects/inventory-project"
-export AGENT_NAME="inventory-ent"
-export MCP_SERVER_URL="https://apim-<token>.azure-api.net/inventory-mcp/mcp"
-export FOUNDRY_MODEL="gpt-4o-mini"
-python scripts/create_agent.py
-
-# 7. テスト
+# テスト
+export FOUNDRY_PROJECT_ENDPOINT=$(azd env get-values | grep FOUNDRY_PROJECT_ENDPOINT | cut -d= -f2 | tr -d '"')
+export AGENT_NAME=inventory-ent-pmi
 python scripts/test_agent.py
+```
 
-# 8. Enterprise DNS（internal CAE の場合）
-#    CAE の defaultDomain と staticIp を取得し Private DNS Zone を作成
-az containerapp env show -g rg-inventory-demo -n cae-ent-<token> \
-    --query "{domain:properties.defaultDomain,ip:properties.staticIp}" -o json
-# → Private DNS Zone: <domain> に * と @ の A レコードを staticIp で作成
+### M365 Copilot への公開
+
+```bash
+# Foundry ポータルから Publish to M365 Copilot（Organization scope 推奨）
+# publish 後に agent identity の権限付け直しが必要
 ```
 
 ## Structure
