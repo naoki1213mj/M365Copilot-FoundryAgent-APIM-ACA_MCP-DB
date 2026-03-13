@@ -24,6 +24,17 @@ hooks:
     continueOnError: true
     run: |
       Write-Host ""
+      # Foundry project 作成（Bicep で project リソースがエラーになるため CLI で）
+      $foundryName = az resource list -g $env:AZURE_RESOURCE_GROUP --resource-type Microsoft.CognitiveServices/accounts --query "[?kind=='AIServices'].name | [0]" -o tsv 2>$null
+      if ($foundryName) {
+        $existing = az cognitiveservices account project show --name $foundryName --resource-group $env:AZURE_RESOURCE_GROUP --project-name inventory-project 2>$null
+        if (-not $existing) {
+          az cognitiveservices account project create --name $foundryName --resource-group $env:AZURE_RESOURCE_GROUP --project-name inventory-project --location $env:AZURE_LOCATION -o none 2>$null
+          Write-Host "Foundry project created: $foundryName/inventory-project"
+        } else {
+          Write-Host "Foundry project already exists: $foundryName/inventory-project"
+        }
+      }
       # MCP API が存在すればセキュリティポリシーを適用
       $apimName = az resource list -g $env:AZURE_RESOURCE_GROUP --resource-type Microsoft.ApiManagement/service --query "[0].name" -o tsv 2>$null
       if ($apimName) {

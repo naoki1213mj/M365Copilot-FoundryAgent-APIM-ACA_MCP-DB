@@ -101,6 +101,17 @@ module defender 'core/defender.bicep' = if (enableEnterpriseSecurity) {
   name: 'defender'
 }
 
+// --- Foundry (AI Services) ---
+module foundry 'core/foundry.bicep' = {
+  scope: rg
+  name: 'foundry'
+  params: {
+    location: location
+    tags: tags
+    resourceToken: resourceToken
+  }
+}
+
 // --- Outputs ---
 output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_CONTAINER_APPS_FQDN string = containerApps.outputs.fqdn
@@ -110,3 +121,4 @@ output AZURE_SQL_DATABASE string = sql.outputs.databaseName
 output AZURE_ACR_LOGIN_SERVER string = acr.outputs.loginServer
 output AZURE_KEYVAULT_URI string = enableEnterpriseSecurity ? keyVault!.outputs.vaultUri : ''
 output ENABLE_ENTERPRISE_SECURITY bool = enableEnterpriseSecurity
+output FOUNDRY_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
