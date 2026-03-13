@@ -6,14 +6,8 @@ param environmentName string
 @description('Primary location')
 param location string = 'japaneast'
 
-@description('SQL admin login')
-param sqlAdminLogin string = 'demoadmin'
-
 @description('Current user principal ID')
 param principalId string
-
-@description('Principal type')
-param principalType string = 'User'
 
 @description('Enable enterprise security (VNet, PE, KV, Defender, Managed ID)')
 param enableEnterpriseSecurity bool = false
@@ -43,8 +37,8 @@ module keyVault 'core/keyvault.bicep' = if (enableEnterpriseSecurity) {
     tags: tags
     resourceToken: resourceToken
     principalId: principalId
-    subnetId: enableEnterpriseSecurity ? network.outputs.peSubnetId : ''
-    vnetId: enableEnterpriseSecurity ? network.outputs.vnetId : ''
+    subnetId: network!.outputs.peSubnetId
+    privateDnsZoneId: network!.outputs.kvDnsZoneId
   }
 }
 
@@ -57,10 +51,10 @@ module sql 'core/sql.bicep' = {
     tags: tags
     resourceToken: resourceToken
     entraAdminObjectId: principalId
-    entraAdminDisplayName: sqlAdminLogin
+    entraAdminDisplayName: 'SQL Admin'
     enableEnterpriseSecurity: enableEnterpriseSecurity
-    subnetId: enableEnterpriseSecurity ? network.outputs.sqlSubnetId : ''
-    vnetId: enableEnterpriseSecurity ? network.outputs.vnetId : ''
+    subnetId: enableEnterpriseSecurity ? network!.outputs.sqlSubnetId : ''
+    privateDnsZoneId: enableEnterpriseSecurity ? network!.outputs.sqlDnsZoneId : ''
   }
 }
 
@@ -81,8 +75,9 @@ module containerApps 'core/container-apps.bicep' = {
     resourceToken: resourceToken
     acrLoginServer: acr.outputs.loginServer
     acrName: acr.outputs.name
+    acrResourceId: acr.outputs.id
     enableEnterpriseSecurity: enableEnterpriseSecurity
-    caSubnetId: enableEnterpriseSecurity ? network.outputs.caSubnetId : ''
+    caSubnetId: enableEnterpriseSecurity ? network!.outputs.caSubnetId : ''
     sqlServerFqdn: sql.outputs.serverFqdn
     sqlDatabaseName: sql.outputs.databaseName
   }
@@ -97,15 +92,13 @@ module apim 'core/apim.bicep' = {
     tags: tags
     resourceToken: resourceToken
     enableEnterpriseSecurity: enableEnterpriseSecurity
-    apimSubnetId: enableEnterpriseSecurity ? network.outputs.apimSubnetId : ''
+    apimSubnetId: enableEnterpriseSecurity ? network!.outputs.apimSubnetId : ''
   }
 }
 
 // --- Defender (enterprise only) ---
 module defender 'core/defender.bicep' = if (enableEnterpriseSecurity) {
-  scope: rg
   name: 'defender'
-  params: { location: location, tags: tags, resourceToken: resourceToken }
 }
 
 // --- Outputs ---
@@ -115,5 +108,5 @@ output AZURE_APIM_GATEWAY_URL string = apim.outputs.gatewayUrl
 output AZURE_SQL_SERVER string = sql.outputs.serverFqdn
 output AZURE_SQL_DATABASE string = sql.outputs.databaseName
 output AZURE_ACR_LOGIN_SERVER string = acr.outputs.loginServer
-output AZURE_KEYVAULT_URI string = enableEnterpriseSecurity ? keyVault.outputs.vaultUri : ''
+output AZURE_KEYVAULT_URI string = enableEnterpriseSecurity ? keyVault!.outputs.vaultUri : ''
 output ENABLE_ENTERPRISE_SECURITY bool = enableEnterpriseSecurity

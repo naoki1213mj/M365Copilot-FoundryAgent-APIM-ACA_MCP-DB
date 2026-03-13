@@ -22,14 +22,19 @@ hooks:
     shell: sh
     run: |
       echo ""
+      # MCP API が存在すればセキュリティポリシーを適用
+      APIM_NAME=$(az resource list -g "$AZURE_RESOURCE_GROUP" --resource-type Microsoft.ApiManagement/service --query "[0].name" -o tsv 2>/dev/null || true)
+      if [ -n "$APIM_NAME" ]; then
+        bash scripts/apply-mcp-policy.sh "$AZURE_RESOURCE_GROUP" "$APIM_NAME"
+      fi
+      echo ""
       echo "=========================================="
       echo "  azd provision 完了。次の手動ステップ:"
       echo "=========================================="
       echo "1. scripts/setup.sql を Azure Portal Query Editor で実行"
       echo "2. APIM → APIs → OpenAPI import → Container Apps の /openapi.json"
       echo "3. APIM → MCP Servers → Create MCP server"
-      echo "   ⚠️ Diagnostics: Frontend Response payload bytes = 0"
       echo "4. Foundry → エージェント作成 → MCP ツール接続"
-      echo "5. Foundry → Publish to M365 Copilot (Individual scope)"
+      echo "5. Foundry → Publish to M365 Copilot (Organization scope 推奨)"
       echo "   ⚠️ publish 後に agent identity の権限付け直し"
       echo "=========================================="

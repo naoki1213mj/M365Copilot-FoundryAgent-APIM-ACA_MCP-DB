@@ -1,9 +1,7 @@
+targetScope = 'subscription'
+
 // Microsoft Defender for Cloud: SQL + Containers
 // WAF Security Operations: continuous threat detection
-
-param location string
-param tags object
-param resourceToken string
 
 // Defender for SQL
 resource defenderSql 'Microsoft.Security/pricings@2024-01-01' = {

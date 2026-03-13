@@ -7,7 +7,7 @@ param entraAdminObjectId string
 param entraAdminDisplayName string = 'SQL Admin'
 param enableEnterpriseSecurity bool
 param subnetId string
-param vnetId string
+param privateDnsZoneId string
 
 var serverName = 'sql-${resourceToken}'
 
@@ -57,6 +57,21 @@ resource pe 'Microsoft.Network/privateEndpoints@2023-11-01' = if (enableEnterpri
         properties: {
           privateLinkServiceId: sqlServer.id
           groupIds: ['sqlServer']
+        }
+      }
+    ]
+  }
+}
+
+resource peDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = if (enableEnterpriseSecurity && !empty(subnetId) && !empty(privateDnsZoneId)) {
+  parent: pe
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'sql-zone'
+        properties: {
+          privateDnsZoneId: privateDnsZoneId
         }
       }
     ]

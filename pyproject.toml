@@ -1,0 +1,9 @@
+[project]
+name = "m365copilot-foundryagent-apim-aca-mcp-db"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "azure-ai-projects>=2.0.0",
+    "azure-identity>=1.25.2",
+]

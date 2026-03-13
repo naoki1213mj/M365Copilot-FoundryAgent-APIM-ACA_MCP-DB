@@ -12,10 +12,30 @@ from contextlib import contextmanager
 from typing import Optional
 
 import pyodbc
+from azure.core.exceptions import AzureError
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("inventory_api")
+
+
+def configure_observability() -> None:
+    """Application Insights 接続文字列がある場合だけ OpenTelemetry を有効化する。"""
+    connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+    if not connection_string:
+        return
+
+    from azure.monitor.opentelemetry import configure_azure_monitor
+
+    configure_azure_monitor(
+        connection_string=connection_string,
+        logger_name="inventory_api",
+    )
+
+
+configure_observability()
+
 app = FastAPI(
     title="在庫参照API",
     description="在庫コントロール用 REST API。SKU 検索、倉庫/カテゴリ絞り込み、発注点割れアラートに対応。APIM 経由で MCP サーバーとして公開され、Foundry エージェント / M365 Copilot から利用可能。",
@@ -45,6 +65,9 @@ def get_db():
         f"Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
     )
     conn = pyodbc.connect(conn_str, attrs_before={1256: _get_mi_token()})
+    conn.setdecoding(pyodbc.SQL_CHAR, encoding="utf-8")
+    conn.setdecoding(pyodbc.SQL_WCHAR, encoding="utf-16-le")
+    conn.setencoding(encoding="utf-8")
     try:
         yield conn
     finally:
@@ -71,6 +94,7 @@ def row_to_dict(row) -> dict:
     response_description="在庫情報",
 )
 def get_inventory_by_sku(sku: str):
+    logger.info("inventory lookup by sku", extra={"sku": sku})
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM inventory WHERE sku = ?", sku)
@@ -93,6 +117,14 @@ def list_inventory(
     category: Optional[str] = Query(None, description="カテゴリ（例: 寝具）"),
     low_stock_only: bool = Query(False, description="true で発注点割れの商品だけ返す"),
 ):
+    logger.info(
+        "inventory list query",
+        extra={
+            "warehouse": warehouse or "",
+            "category": category or "",
+            "low_stock_only": low_stock_only,
+        },
+    )
     with get_db() as conn:
         cursor = conn.cursor()
         q, p = "SELECT * FROM inventory WHERE 1=1", []
@@ -114,7 +146,8 @@ def health():
         with get_db() as conn:
             conn.cursor().execute("SELECT 1")
         return {"status": "healthy", "database": "connected", "auth": "entra_id"}
-    except Exception as e:
+    except (pyodbc.Error, AzureError) as e:
+        logger.exception("health check failed")
         return JSONResponse(
             status_code=503, content={"status": "unhealthy", "error": str(e)}
         )

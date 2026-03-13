@@ -5,7 +5,7 @@ param tags object
 param resourceToken string
 param principalId string
 param subnetId string
-param vnetId string
+param privateDnsZoneId string
 
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: 'kv-${resourceToken}'
@@ -17,6 +17,7 @@ resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
+    publicNetworkAccess: !empty(subnetId) ? 'Disabled' : 'Enabled'
     networkAcls: !empty(subnetId) ? {
       defaultAction: 'Deny'
       bypass: 'AzureServices'
@@ -50,6 +51,21 @@ resource pe 'Microsoft.Network/privateEndpoints@2023-11-01' = if (!empty(subnetI
         properties: {
           privateLinkServiceId: kv.id
           groupIds: ['vault']
+        }
+      }
+    ]
+  }
+}
+
+resource peDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = if (!empty(subnetId) && !empty(privateDnsZoneId)) {
+  parent: pe
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'kv-zone'
+        properties: {
+          privateDnsZoneId: privateDnsZoneId
         }
       }
     ]

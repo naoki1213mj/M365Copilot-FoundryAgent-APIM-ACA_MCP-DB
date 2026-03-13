@@ -1,0 +1,13 @@
+[
+  {
+    "allowedMemberTypes": [
+      "Application"
+    ],
+    "description": "Read-only inventory MCP tools",
+    "displayName": "MCP.Tools.Read",
+    "id": "4f61bbe8-59b6-4999-82f7-7ac8644ccb3f",
+    "isEnabled": true,
+    "origin": "Application",
+    "value": "MCP.Tools.Read"
+  }
+]

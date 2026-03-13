@@ -6,10 +6,15 @@ param tags object
 param resourceToken string
 param acrLoginServer string
 param acrName string
+param acrResourceId string
 param enableEnterpriseSecurity bool
 param caSubnetId string
 param sqlServerFqdn string
 param sqlDatabaseName string
+
+var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+var managedEnvironmentName = enableEnterpriseSecurity ? 'cae-ent-${resourceToken}' : 'cae-${resourceToken}'
+var containerAppName = enableEnterpriseSecurity ? 'inventory-api-ent' : 'inventory-api'
 
 // --- Log Analytics ---
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -19,9 +24,36 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   properties: { sku: { name: 'PerGB2018' }, retentionInDays: 30 }
 }
 
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'appi-api-${resourceToken}'
+  location: location
+  tags: tags
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
+  }
+}
+
+resource acrPullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-acr-pull-${resourceToken}'
+  location: location
+  tags: tags
+}
+
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acrResourceId, acrPullIdentity.id, 'acr-pull')
+  scope: acr
+  properties: {
+    principalId: acrPullIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: acrPullRoleDefinitionId
+  }
+}
+
 // --- Container Apps Environment ---
 resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
-  name: 'cae-${resourceToken}'
+  name: managedEnvironmentName
   location: location
   tags: tags
   properties: {
@@ -44,11 +76,14 @@ resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
 
 // --- Container App ---
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: 'inventory-api'
+  name: containerAppName
   location: location
   tags: union(tags, { 'azd-service-name': 'inventory-api' })
   identity: {
-    type: 'SystemAssigned'
+    type: 'SystemAssigned,UserAssigned'
+    userAssignedIdentities: {
+      '${acrPullIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: caEnv.id
@@ -62,12 +97,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acrLoginServer
-          username: acrName
-          passwordSecretRef: 'acr-password'
+          identity: acrPullIdentity.id
         }
-      ]
-      secrets: [
-        { name: 'acr-password', value: acr.listCredentials().passwords[0].value }
       ]
     }
     template: {
@@ -80,6 +111,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'USE_MANAGED_IDENTITY', value: 'true' }
             { name: 'SQL_SERVER_FQDN', value: sqlServerFqdn }
             { name: 'SQL_DATABASE_NAME', value: sqlDatabaseName }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
+            { name: 'OTEL_SERVICE_NAME', value: containerAppName }
+            { name: 'LOG_LEVEL', value: 'INFO' }
           ]
         }
       ]
@@ -96,3 +130,4 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
 output fqdn string = containerApp.properties.configuration.ingress.fqdn
 output principalId string = containerApp.identity.principalId
 output envId string = caEnv.id
+output name string = containerApp.name

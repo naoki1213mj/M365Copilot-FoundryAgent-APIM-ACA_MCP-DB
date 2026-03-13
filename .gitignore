@@ -10,3 +10,10 @@ Thumbs.db
 *.swp
 articles/.contentlayer/
 openapi_check.json
+uv.lock
+
+# 一時デバッグファイル
+.auth_test_*
+_apim_*.json
+scripts/_*
+!scripts/__pycache__/

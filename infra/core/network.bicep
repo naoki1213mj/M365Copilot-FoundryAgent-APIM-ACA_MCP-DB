@@ -20,9 +20,14 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
         properties: {
           addressPrefix: '10.0.1.0/24'
           networkSecurityGroup: { id: nsgApim.id }
-          delegations: [
-            { name: 'apim', properties: { serviceName: 'Microsoft.Web/serverFarms' } }
-          ]
+            delegations: [
+              {
+                name: 'apim-outbound'
+                properties: {
+                  serviceName: 'Microsoft.Web/serverFarms'
+                }
+              }
+            ]
         }
       }
       {
@@ -30,6 +35,14 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
         properties: {
           addressPrefix: '10.0.2.0/23'
           networkSecurityGroup: { id: nsgCa.id }
+            delegations: [
+              {
+                name: 'container-apps-environment'
+                properties: {
+                  serviceName: 'Microsoft.App/environments'
+                }
+              }
+            ]
         }
       }
       {
@@ -186,6 +199,18 @@ resource caDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   }
 }
 
+resource kvDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.vaultcore.azure.net'
+  location: 'global'
+  tags: tags
+
+  resource vnetLink 'virtualNetworkLinks' = {
+    name: 'kv-vnet-link'
+    location: 'global'
+    properties: { virtualNetwork: { id: vnet.id }, registrationEnabled: false }
+  }
+}
+
 output vnetId string = vnet.id
 output apimSubnetId string = vnet.properties.subnets[0].id
 output caSubnetId string = vnet.properties.subnets[1].id
@@ -193,3 +218,4 @@ output sqlSubnetId string = vnet.properties.subnets[2].id
 output peSubnetId string = vnet.properties.subnets[3].id
 output sqlDnsZoneId string = sqlDnsZone.id
 output caDnsZoneId string = caDnsZone.id
+output kvDnsZoneId string = kvDnsZone.id

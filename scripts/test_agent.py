@@ -10,12 +10,22 @@ from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
 PROJECT_ENDPOINT = os.environ["FOUNDRY_PROJECT_ENDPOINT"]
-AGENT_NAME = "inventory-assistant"
-AGENT_VERSION = os.environ.get("AGENT_VERSION", "1")
+AGENT_NAME = os.environ.get("AGENT_NAME", "inventory-assistant")
+AGENT_VERSION = os.environ.get("AGENT_VERSION", "")  # 空なら最新バージョンを自動取得
 
 credential = DefaultAzureCredential()
 project_client = AIProjectClient(endpoint=PROJECT_ENDPOINT, credential=credential)
 openai_client = project_client.get_openai_client()
+
+# バージョン自動解決
+if not AGENT_VERSION:
+    versions = list(
+        project_client.agents.list_versions(AGENT_NAME, order="desc", limit=1)
+    )
+    if not versions:
+        raise RuntimeError(f"エージェント '{AGENT_NAME}' のバージョンが見つかりません")
+    AGENT_VERSION = versions[0].version
+    print(f"最新バージョン自動取得: {AGENT_NAME}:{AGENT_VERSION}")
 
 # テストクエリ
 test_query = "INV-004 の在庫を教えて"
