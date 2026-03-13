@@ -22,3 +22,18 @@ apim-*.json
 api-*.txt
 ingress-*.json
 openapi-export.json
+
+# Zenn 記事（リポジトリ非公開）
+articles/
+package.json
+.prettierignore
+.github/agents/zenn-*.agent.md
+.github/agents/factchecker.agent.md
+.github/skills/zenn-*/
+.github/skills/zenn-writing-style/
+.github/skills/zenn-article-review/
+.github/skills/zenn-factcheck/
+.github/prompts/fix-ai-style.prompt.md
+.github/prompts/full-review.prompt.md
+.github/prompts/sns-post.prompt.md
+.github/instructions/markdown.instructions.md
