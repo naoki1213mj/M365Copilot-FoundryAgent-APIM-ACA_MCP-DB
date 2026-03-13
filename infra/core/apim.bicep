@@ -14,7 +14,7 @@ var authPolicyXml = ''
 var rateLimitPolicyXml = ''
 var apimPolicy = '<policies><inbound>${authPolicyXml}${rateLimitPolicyXml}</inbound><backend><forward-request /></backend><outbound></outbound><on-error></on-error></policies>'
 
-resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
+resource apim 'Microsoft.ApiManagement/service@2024-05-01' = {
   name: 'apim-${resourceToken}'
   location: location
   tags: tags

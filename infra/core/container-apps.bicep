@@ -1,5 +1,6 @@
 // Container Apps - workload profiles, System Managed Identity
-// Enterprise: internal ingress + VNet integration + MI for SQL
+// Enterprise: internal CAE (VNet-scope ingress) + MI for SQL
+// internal CAE + external ingress = VNet 内からのみアクセス可能（インターネット非公開）
 
 param location string
 param tags object
@@ -90,7 +91,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: !enableEnterpriseSecurity
+        // internal CAE では external: true = VNet scope（インターネット非公開）
+        // external: false にすると CA Environment 内からのみとなり APIM から到達不可
+        external: true
         targetPort: 8000
         transport: 'auto'
       }

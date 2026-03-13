@@ -18,3 +18,7 @@ _apim_*.json
 scripts/_*
 !scripts/__pycache__/
 azd-*.log
+apim-*.json
+api-*.txt
+ingress-*.json
+openapi-export.json
