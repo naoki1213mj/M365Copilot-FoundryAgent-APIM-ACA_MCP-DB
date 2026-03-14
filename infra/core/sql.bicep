@@ -42,6 +42,26 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   location: location
   tags: tags
   sku: { name: 'Basic', tier: 'Basic' }
+  properties: {
+    collation: 'Japanese_CI_AS'
+  }
+}
+
+// Diagnostic Settings (enterprise only)
+param logAnalyticsId string = ''
+
+resource sqlDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (enableEnterpriseSecurity && !empty(logAnalyticsId)) {
+  scope: database
+  name: 'sql-diagnostics'
+  properties: {
+    workspaceId: logAnalyticsId
+    logs: [
+      { categoryGroup: 'allLogs', enabled: true }
+    ]
+    metrics: [
+      { category: 'Basic', enabled: true }
+    ]
+  }
 }
 
 // Private Endpoint (enterprise only)
@@ -81,3 +101,4 @@ resource peDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups
 output serverFqdn string = sqlServer.properties.fullyQualifiedDomainName
 output databaseName string = database.name
 output serverId string = sqlServer.id
+output databaseId string = database.id

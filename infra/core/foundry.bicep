@@ -83,5 +83,4 @@ resource deployGpt52 'Microsoft.CognitiveServices/accounts/deployments@2024-10-0
 }
 
 output accountName string = foundryAccount.name
-output projectName string = foundryProject.name
 output projectEndpoint string = 'https://${accountName}.services.ai.azure.com/api/projects/inventory-project'

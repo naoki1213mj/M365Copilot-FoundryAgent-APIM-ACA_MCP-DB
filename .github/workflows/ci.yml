@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tests/**', 'Dockerfile', 'pyproject.toml', 'infra/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r src/requirements.txt
+          pip install pytest httpx ruff
+
+      - name: Lint (ruff)
+        run: ruff check src/ tests/ scripts/*.py
+
+      - name: Format check (ruff)
+        run: ruff format --check src/ tests/
+
+      - name: Test (pytest)
+        env:
+          SQL_SERVER_FQDN: localhost
+          SQL_DATABASE_NAME: test_db
+        run: pytest tests/ -v --tb=short
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pip-audit ruff
+
+      - name: Dependency audit (pip-audit)
+        run: pip-audit -r src/requirements.txt --desc
+
+      - name: Security lint (ruff - bandit rules)
+        run: ruff check src/ --select S --statistics
+
+  bicep-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x bicep && sudo mv bicep /usr/local/bin/
+
+      - name: Bicep build (syntax validation)
+        run: bicep build infra/main.bicep --no-restore
+
+  deploy:
+    needs: [lint-and-test, security-scan, bicep-validate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies (for postprovision)
+        run: pip install -r src/requirements.txt azure-ai-projects
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Log in with Azure (federated credentials)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in with azd (federated credentials)
+        run: azd auth login --client-id "${{ vars.AZURE_CLIENT_ID }}" --federated-credential-provider "github" --tenant-id "${{ vars.AZURE_TENANT_ID }}"
+
+      - name: Deploy (azd up)
+        run: azd up --no-prompt
+        env:
+          AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ENABLE_ENTERPRISE_SECURITY: ${{ vars.ENABLE_ENTERPRISE_SECURITY }}
+          ENTRA_APP_CLIENT_ID: ${{ vars.ENTRA_APP_CLIENT_ID }}
+
+      - name: Smoke test
+        run: |
+          pwsh scripts/smoke_test.ps1 -ResourceGroup "rg-${{ vars.AZURE_ENV_NAME }}"

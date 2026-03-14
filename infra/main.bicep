@@ -12,6 +12,9 @@ param principalId string
 @description('Enable enterprise security (VNet, PE, KV, Defender, Managed ID)')
 param enableEnterpriseSecurity bool = false
 
+@description('Email address for alert notifications (enterprise only)')
+param alertEmailAddress string = ''
+
 var resourceToken = uniqueString(subscription().id, environmentName, location)
 var tags = { 'azd-env-name': environmentName, project: 'inventory-api' }
 
@@ -39,6 +42,8 @@ module keyVault 'core/keyvault.bicep' = if (enableEnterpriseSecurity) {
     principalId: principalId
     subnetId: network!.outputs.peSubnetId
     privateDnsZoneId: network!.outputs.kvDnsZoneId
+    appInsightsConnectionString: containerApps.outputs.appInsightsConnectionString
+    logAnalyticsId: enableEnterpriseSecurity ? network!.outputs.logAnalyticsId : ''
   }
 }
 
@@ -55,6 +60,7 @@ module sql 'core/sql.bicep' = {
     enableEnterpriseSecurity: enableEnterpriseSecurity
     subnetId: enableEnterpriseSecurity ? network!.outputs.sqlSubnetId : ''
     privateDnsZoneId: enableEnterpriseSecurity ? network!.outputs.sqlDnsZoneId : ''
+    logAnalyticsId: enableEnterpriseSecurity ? network!.outputs.logAnalyticsId : ''
   }
 }
 
@@ -99,6 +105,33 @@ module apim 'core/apim.bicep' = {
 // --- Defender (enterprise only) ---
 module defender 'core/defender.bicep' = if (enableEnterpriseSecurity) {
   name: 'defender'
+}
+
+// --- Alerts (enterprise only) ---
+module alerts 'core/alerts.bicep' = if (enableEnterpriseSecurity) {
+  scope: rg
+  name: 'alerts'
+  params: {
+    location: location
+    tags: tags
+    resourceToken: resourceToken
+    logAnalyticsId: network!.outputs.logAnalyticsId
+    appInsightsId: containerApps.outputs.appInsightsId
+    sqlDatabaseId: sql.outputs.databaseId
+    alertEmailAddress: alertEmailAddress
+  }
+}
+
+// --- Grafana Dashboard (enterprise only) ---
+// Azure Monitor dashboards with Grafana（無料・ポータル組み込み版）
+module grafanaDashboard 'core/grafana-dashboard.bicep' = if (enableEnterpriseSecurity) {
+  scope: rg
+  name: 'grafana-dashboard'
+  params: {
+    location: location
+    tags: tags
+    resourceToken: resourceToken
+  }
 }
 
 // --- Foundry (AI Services) ---

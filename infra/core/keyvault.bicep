@@ -72,6 +72,34 @@ resource peDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups
   }
 }
 
+// Secrets
+param appInsightsConnectionString string = ''
+
+resource secretAppInsights 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(appInsightsConnectionString)) {
+  parent: kv
+  name: 'appinsights-connection-string'
+  properties: {
+    value: appInsightsConnectionString
+  }
+}
+
+// Diagnostic Settings
+param logAnalyticsId string = ''
+
+resource kvDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(logAnalyticsId)) {
+  scope: kv
+  name: 'kv-diagnostics'
+  properties: {
+    workspaceId: logAnalyticsId
+    logs: [
+      { categoryGroup: 'audit', enabled: true }
+    ]
+    metrics: [
+      { category: 'AllMetrics', enabled: true }
+    ]
+  }
+}
+
 output vaultUri string = kv.properties.vaultUri
 output vaultName string = kv.name
 output vaultId string = kv.id

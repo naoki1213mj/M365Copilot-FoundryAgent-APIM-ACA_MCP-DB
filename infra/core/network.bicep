@@ -59,6 +59,12 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
           privateEndpointNetworkPolicies: 'Disabled'
         }
       }
+      {
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: '10.0.6.0/26'
+        }
+      }
     ]
   }
 }
@@ -235,3 +241,60 @@ output peSubnetId string = vnet.properties.subnets[3].id
 output sqlDnsZoneId string = sqlDnsZone.id
 output caDnsZoneId string = caDnsZone.id
 output kvDnsZoneId string = kvDnsZone.id
+output logAnalyticsId string = logAnalytics.id
+
+// --- Log Analytics (共有) ---
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: 'log-${resourceToken}'
+  location: location
+  tags: tags
+  properties: { sku: { name: 'PerGB2018' }, retentionInDays: 30 }
+}
+
+// --- Flow Log 用 Storage Account ---
+resource flowLogStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: take('stflow${replace(resourceToken, '-', '')}', 24)
+  location: location
+  tags: tags
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    networkAcls: { defaultAction: 'Deny', bypass: 'AzureServices' }
+  }
+}
+
+// --- NSG Flow Logs ---
+// Network Watcher は NetworkWatcherRG に自動作成されるため Bicep では定義できない。
+// postprovision.py で az network watcher flow-log create を使って設定する。
+// Storage Account (flowLogStorage) は Bicep で作成済み。
+
+// --- Azure Bastion ---
+resource bastionPip 'Microsoft.Network/publicIPAddresses@2023-11-01' = {
+  name: 'pip-bastion-${resourceToken}'
+  location: location
+  tags: tags
+  sku: { name: 'Standard' }
+  properties: { publicIPAllocationMethod: 'Static' }
+}
+
+resource bastion 'Microsoft.Network/bastionHosts@2023-11-01' = {
+  name: 'bastion-${resourceToken}'
+  location: location
+  tags: tags
+  sku: { name: 'Standard' }
+  properties: {
+    enableTunneling: true
+    enableIpConnect: true
+    ipConfigurations: [
+      {
+        name: 'bastion-ip-config'
+        properties: {
+          publicIPAddress: { id: bastionPip.id }
+          subnet: { id: vnet.properties.subnets[4].id }
+        }
+      }
+    ]
+  }
+}

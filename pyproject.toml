@@ -1,9 +1,24 @@
 [project]
 name = "m365copilot-foundryagent-apim-aca-mcp-db"
-version = "0.1.0"
-description = "Add your description here"
+version = "2.0.0"
+description = "Foundry Agent + APIM MCP + M365 Copilot 在庫参照デモ"
 requires-python = ">=3.12"
 dependencies = [
     "azure-ai-projects>=2.0.0",
     "azure-identity>=1.25.2",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "S", "B", "UP"]
+ignore = ["S608"]  # SQL インジェクション警告 (パラメータ化済み)
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # assert 許可
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

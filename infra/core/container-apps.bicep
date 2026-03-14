@@ -134,3 +134,5 @@ output fqdn string = containerApp.properties.configuration.ingress.fqdn
 output principalId string = containerApp.identity.principalId
 output envId string = caEnv.id
 output name string = containerApp.name
+output appInsightsId string = appInsights.id
+output appInsightsConnectionString string = appInsights.properties.ConnectionString

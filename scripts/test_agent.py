@@ -19,16 +19,14 @@ openai_client = project_client.get_openai_client()
 
 # バージョン自動解決
 if not AGENT_VERSION:
-    versions = list(
-        project_client.agents.list_versions(AGENT_NAME, order="desc", limit=1)
-    )
+    versions = list(project_client.agents.list_versions(AGENT_NAME, order="desc", limit=1))
     if not versions:
         raise RuntimeError(f"エージェント '{AGENT_NAME}' のバージョンが見つかりません")
     AGENT_VERSION = versions[0].version
     print(f"最新バージョン自動取得: {AGENT_NAME}:{AGENT_VERSION}")
 
 # テストクエリ
-test_query = "INV-004 の在庫を教えて"
+test_query = "川崎倉庫で発注点割れしている商品を教えて"
 print(f"質問: {test_query}")
 print("-" * 50)
 

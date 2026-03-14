@@ -34,8 +34,9 @@ for stmt in sql.split(";"):
             print(f"Error: {e}\nStatement: {stmt[:80]}...")
 
 # 確認
-cursor.execute("SELECT COUNT(*) FROM inventory")
-count = cursor.fetchone()[0]
-print(f"Inserted {count} rows into inventory table")
+for table in ("products", "warehouses", "inventory"):
+    cursor.execute(f"SELECT COUNT(*) FROM {table}")  # noqa: S608 — テーブル名は固定リテラル
+    count = cursor.fetchone()[0]
+    print(f"  {table}: {count} rows")
 
 conn.close()

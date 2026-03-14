@@ -19,8 +19,31 @@ services:
     language: python
 
 hooks:
+  preprovision:
+    shell: pwsh
+    continueOnError: true
+    run: |
+      # 初回デプロイ時、ACR にイメージがないと Container App が起動失敗する。
+      # MCR からプレースホルダーイメージをインポートして回避する。
+      $acrName = azd env get-value AZURE_ACR_LOGIN_SERVER 2>$null
+      if (-not $acrName) {
+        $rg = azd env get-value AZURE_RESOURCE_GROUP 2>$null
+        if ($rg) {
+          $acrName = az resource list -g $rg --resource-type Microsoft.ContainerRegistry/registries --query "[0].name" -o tsv 2>$null
+        }
+      } else {
+        $acrName = $acrName.Split('.')[0]
+      }
+      if ($acrName) {
+        $existing = az acr repository list --name $acrName -o tsv 2>$null
+        if (-not $existing) {
+          Write-Host "Importing placeholder image to ACR: $acrName"
+          az acr import --name $acrName --source mcr.microsoft.com/azuredocs/containerapps-helloworld:latest --image inventory-api:latest 2>$null
+        }
+      }
   postprovision:
     shell: pwsh
     continueOnError: true
     run: |
-      & $PSScriptRoot/.venv/Scripts/python.exe $PSScriptRoot/scripts/postprovision.py
+      $pythonCmd = if (Test-Path "$PSScriptRoot/.venv/Scripts/python.exe") { "$PSScriptRoot/.venv/Scripts/python.exe" } elseif (Test-Path "$PSScriptRoot/.venv/bin/python") { "$PSScriptRoot/.venv/bin/python" } else { "python" }
+      & $pythonCmd $PSScriptRoot/scripts/postprovision.py
