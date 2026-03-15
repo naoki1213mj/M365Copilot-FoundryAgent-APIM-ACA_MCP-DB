@@ -44,7 +44,7 @@ response = openai_client.responses.create(
 
 # MCP approval ループ
 max_loops = 5
-for i in range(max_loops):
+for _ in range(max_loops):
     # MCP approval request があるか確認
     approval_needed = False
     for item in response.output:

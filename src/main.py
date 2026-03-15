@@ -107,13 +107,13 @@ def get_db():
 def _rows_to_dicts(cursor) -> list[dict]:
     """pyodbc Row を dict のリストに変換する。"""
     columns = [col[0] for col in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
 
 
 def _row_to_dict(cursor, row) -> dict:
     """pyodbc Row 1件を dict に変換する。"""
     columns = [col[0] for col in cursor.description]
-    return dict(zip(columns, row))
+    return dict(zip(columns, row, strict=True))
 
 
 # ======================================
@@ -131,7 +131,11 @@ def list_products(
 ):
     with get_db() as conn:
         cursor = conn.cursor()
-        q = "SELECT TOP(?) product_code, product_name, category, unit_price, reorder_point, supplier, is_active FROM products WHERE is_active = 1"
+        q = (
+            "SELECT TOP(?) product_code, product_name, category,"
+            " unit_price, reorder_point, supplier, is_active"
+            " FROM products WHERE is_active = 1"
+        )
         p: list = [limit]
         if category:
             q += " AND category = ?"
