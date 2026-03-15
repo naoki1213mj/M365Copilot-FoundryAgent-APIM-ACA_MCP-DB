@@ -3,12 +3,19 @@
 [![CI](https://github.com/naoki1213mj/M365Copilot-FoundryAgent-APIM-ACA_MCP-DB/actions/workflows/ci.yml/badge.svg)](https://github.com/naoki1213mj/M365Copilot-FoundryAgent-APIM-ACA_MCP-DB/actions/workflows/ci.yml)
 
 Foundry エージェントが APIM (MCP Server) 経由で在庫 REST API を参照し、M365 Copilot / Teams で動くデモ。
-`enableEnterpriseSecurity=true` でエンタープライズ本番構成（VNet, PE, KV, Bastion, Defender, MI, Grafana, アラート）に切り替え可能。
-`USE_AI_GATEWAY=true`（デフォルト）で APIM を AI Gateway として Foundry に接続し、モデル呼び出しもガバナンス対象にできる。
+環境変数 2 つで 3 パターンに切り替え可能:
+
+| 構成 | コマンド | APIM の役割 | ネットワーク |
+|------|---------|---------|--------|
+| **デモ + AI Gateway**（デフォルト） | `azd up` | MCP Server + AI Gateway（LLM 推論も APIM 経由） | public |
+| **デモ + MCP Only** | `azd env set USE_AI_GATEWAY false && azd up` | MCP Server のみ（LLM 推論は Foundry 直接） | public |
+| **エンタープライズ** | `azd env set ENABLE_ENTERPRISE_SECURITY true && azd up` | MCP Server + AI Gateway | VNet + PE + KV + Defender |
 
 ## Architecture
 
-### 論理アーキテクチャ（AI Gateway 経路）
+### 論理アーキテクチャ（AI Gateway 有効、デフォルト）
+
+APIM が **MCP Server**（REST → MCP 変換）と **AI Gateway**（LLM 推論プロキシ）の 2 役を担う。ツール呼び出しもモデル推論も APIM 経由になるので、TPM 制御や Content Safety を APIM ポリシーで一元管理できる。
 
 ```mermaid
 graph LR
@@ -19,7 +26,9 @@ graph LR
     CA -->|Managed Identity| SQL["🗃️ Azure SQL<br/>(在庫データ)"]
 ```
 
-### 論理アーキテクチャ（従来経路）
+### 論理アーキテクチャ（MCP Only、AI Gateway 無効）
+
+APIM は **MCP Server のみ**。LLM 推論は Foundry から直接 AI Services へ。APIM のガバナンスは MCP ツール呼び出し（JWT + rate limit）のみに限定されるが、レイテンシが低くシンプル。
 
 ```mermaid
 graph LR
@@ -140,7 +149,7 @@ az rest --url "https://graph.microsoft.com/v1.0/policies/authorizationPolicy" \
 azd auth login
 azd up
 
-# 従来経路（AI Gateway 無効）
+# デモ（public、MCP Only、AI Gateway 無効）
 azd env set USE_AI_GATEWAY false
 azd up
 
@@ -178,7 +187,7 @@ APIM Standard v2 の outbound VNet integration は Bicep で `virtualNetworkType
 
 ### Step 2: APIM MCP Server 作成
 
-> MCP Server の ARM API は未公開のためポータル手動操作が必要（AI Gateway / 従来経路の両方で必要）。
+> MCP Server の ARM API は未公開のためポータル手動操作が必要（AI Gateway / MCP Only の両方で必要）。
 
 1. Azure ポータル → APIM → 左メニュー **MCP Servers**
 2. **+ Create MCP server** をクリック
@@ -313,7 +322,7 @@ M365 Copilot チャットまたは Teams で `@Inventory Assistant` を呼び出
 | パラメータ | 経路 | 説明 |
 |-----------|------|------|
 | `USE_AI_GATEWAY=true` (デフォルト) | AI Gateway | APIM を AI Gateway として Foundry に接続。モデル呼び出しも APIM 経由でガバナンス |
-| `USE_AI_GATEWAY=false` | 従来 | RemoteTool connection のみ。MCP ツール呼び出しだけ APIM 経由 |
+| `USE_AI_GATEWAY=false` | MCP Only | MCP ツール呼び出しだけ APIM 経由。LLM 推論は Foundry から直接 AI Services へ |
 
 ## Project Structure
 
@@ -337,7 +346,7 @@ infra/                   ← Bicep (azd provision)
     defender.bicep       ← Defender for Cloud
     acr.bicep            ← Container Registry
 scripts/
-  postprovision.py       ← azd up 後の自動セットアップ (11 steps, AI Gateway / 従来経路分岐)
+  postprovision.py       ← azd up 後の自動セットアップ (11 steps, AI Gateway / MCP Only 分岐)
   create_agent.py        ← Foundry agent 作成
   test_agent.py          ← Foundry agent テスト
   setup.sql              ← 3 テーブル + サンプルデータ (products, warehouses, inventory)
