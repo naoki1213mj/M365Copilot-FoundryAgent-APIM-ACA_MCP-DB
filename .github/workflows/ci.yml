@@ -6,6 +6,12 @@ on:
     paths: ['src/**', 'tests/**', 'Dockerfile', 'pyproject.toml', 'infra/**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy to Azure (azd up)'
+        type: boolean
+        default: false
 
 jobs:
   lint-and-test:
@@ -67,7 +73,7 @@ jobs:
 
   deploy:
     needs: [lint-and-test, security-scan, bicep-validate]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy == true
     runs-on: ubuntu-latest
     environment: production
     permissions:
