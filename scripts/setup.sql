@@ -47,76 +47,76 @@ CREATE TABLE inventory (
 -- 倉庫データ (3拠点)
 -- ========================================
 INSERT INTO warehouses (warehouse_code, warehouse_name, region, capacity) VALUES
-('KWS', N'川崎倉庫', N'関東', 50000),
-('OSK', N'大阪倉庫', N'関西', 35000),
-('FKO', N'福岡倉庫', N'九州', 20000);
+('WH-E', N'East Warehouse',    N'East Region',    50000),
+('WH-C', N'Central Warehouse', N'Central Region', 35000),
+('WH-W', N'West Warehouse',    N'West Region',    20000);
 
 -- ========================================
 -- 商品データ (20品)
 -- ========================================
 INSERT INTO products (product_code, product_name, category, unit_price, reorder_point, supplier) VALUES
-('PRD-001', N'収納ボックス 3段',          N'収納',     2980,  500, N'アイリスオーヤマ'),
-('PRD-002', N'収納ケース 標準',            N'収納',     1480, 1500, N'天馬'),
-('PRD-003', N'押入れ収納ケース 標準',      N'収納',     1980,  400, N'天馬'),
-('PRD-004', N'冷感寝具パッド シングル',    N'寝具',     3980,  200, N'ニトリ'),
-('PRD-005', N'マットレス ダブル',          N'寝具',    29800,   50, N'シモンズ'),
-('PRD-006', N'標準枕',                    N'寝具',     1280,  800, N'西川'),
-('PRD-007', N'掛け布団カバー',            N'寝具',     2480,  300, N'西川'),
-('PRD-008', N'フライパン 26cm',           N'キッチン',  3280,  600, N'ティファール'),
-('PRD-009', N'キッチン収納ラック',        N'キッチン',  4980,  400, N'山善'),
-('PRD-010', N'保存容器 4点セット',        N'キッチン',  1680,  200, N'イワキ'),
-('PRD-011', N'折りたたみテーブル',        N'家具',     8980,  300, N'山善'),
-('PRD-012', N'デスクチェア 布張り',        N'家具',    15800,  200, N'オカムラ'),
-('PRD-013', N'ローボード 150cm',          N'家具',    24800,  100, N'大塚家具'),
-('PRD-014', N'2人掛けソファ',             N'家具',    49800,  150, N'カリモク'),
-('PRD-015', N'デスクライト',              N'照明',     4580,  800, N'パナソニック'),
-('PRD-016', N'シーリングライト 8畳',      N'照明',    12800,  200, N'パナソニック'),
-('PRD-017', N'吸水バスマット',            N'バス用品',  1980,  300, N'soil'),
-('PRD-018', N'ハンガー 10本組',           N'洗濯用品',   780, 2000, N'マワ'),
-('PRD-019', N'ロールスクリーン',          N'インテリア', 5480,  200, N'タチカワ'),
-('PRD-020', N'装飾グリーン',              N'インテリア', 2980,  100, N'ニトリ');
+('PRD-001', N'Wireless Mouse',             N'Electronics',      2980,  500, N'Supplier-A'),
+('PRD-002', N'USB-C Hub 7-port',           N'Electronics',      1480, 1500, N'Supplier-A'),
+('PRD-003', N'Noise Cancelling Headset',   N'Electronics',      1980,  400, N'Supplier-B'),
+('PRD-004', N'Ergonomic Keyboard',         N'Electronics',      3980,  200, N'Supplier-B'),
+('PRD-005', N'27-inch Monitor',            N'Electronics',     29800,   50, N'Supplier-C'),
+('PRD-006', N'Ballpoint Pen 10-pack',      N'Office Supplies',  1280,  800, N'Supplier-D'),
+('PRD-007', N'A4 Copy Paper 500-sheet',    N'Office Supplies',  2480,  300, N'Supplier-D'),
+('PRD-008', N'Whiteboard Marker Set',      N'Office Supplies',  3280,  600, N'Supplier-E'),
+('PRD-009', N'Desk Organizer',             N'Office Supplies',  4980,  400, N'Supplier-E'),
+('PRD-010', N'Sticky Notes Assorted',      N'Office Supplies',  1680,  200, N'Supplier-F'),
+('PRD-011', N'Standing Desk',              N'Furniture',        8980,  300, N'Supplier-G'),
+('PRD-012', N'Office Chair Mesh',          N'Furniture',       15800,  200, N'Supplier-G'),
+('PRD-013', N'Bookshelf 5-tier',           N'Furniture',       24800,  100, N'Supplier-H'),
+('PRD-014', N'Meeting Table 6-seat',       N'Furniture',       49800,  150, N'Supplier-H'),
+('PRD-015', N'LED Desk Lamp',              N'Lighting',         4580,  800, N'Supplier-I'),
+('PRD-016', N'Ceiling Light Panel',        N'Lighting',        12800,  200, N'Supplier-I'),
+('PRD-017', N'Power Strip 6-outlet',       N'Accessories',      1980,  300, N'Supplier-J'),
+('PRD-018', N'Cable Management Kit',       N'Accessories',       780, 2000, N'Supplier-J'),
+('PRD-019', N'Webcam HD 1080p',            N'Peripherals',      5480,  200, N'Supplier-K'),
+('PRD-020', N'Portable Speaker',           N'Peripherals',      2980,  100, N'Supplier-K');
 
 -- ========================================
--- 在庫データ (31行: KWS 12品, OSK 10品, FKO 9品)
+-- 在庫データ (31行: WH-E 12品, WH-C 10品, WH-W 9品)
 -- 発注点割れが 8件含まれる
 -- ========================================
 INSERT INTO inventory (product_id, warehouse_id, quantity, reserved)
 SELECT p.product_id, w.warehouse_id, v.quantity, v.reserved
 FROM (VALUES
-    -- 川崎倉庫 (KWS = warehouse_id 1)
-    ('PRD-001', 'KWS', 1250,  30),
-    ('PRD-002', 'KWS', 3400, 200),
-    ('PRD-004', 'KWS',  340,  15),
-    ('PRD-005', 'KWS',   45,   5),  -- 発注点割れ (50)
-    ('PRD-008', 'KWS',  280,  10),
-    ('PRD-010', 'KWS',   75,   0),  -- 発注点割れ (200)
-    ('PRD-013', 'KWS',   95,   8),  -- 発注点割れ (100)
-    ('PRD-015', 'KWS',  920,  50),
-    ('PRD-016', 'KWS',  560,  20),
-    ('PRD-017', 'KWS',  120,   0),  -- 発注点割れ (300)
-    ('PRD-018', 'KWS', 2800, 100),
-    ('PRD-020', 'KWS',   30,   5),  -- 発注点割れ (100)
-    -- 大阪倉庫 (OSK = warehouse_id 2)
-    ('PRD-001', 'OSK',  480,  20),
-    ('PRD-002', 'OSK', 1200,  80),
-    ('PRD-003', 'OSK',  180,   0),  -- 発注点割れ (400)
-    ('PRD-006', 'OSK', 2200, 150),
-    ('PRD-009', 'OSK',  890,  30),
-    ('PRD-011', 'OSK',  670,  25),
-    ('PRD-012', 'OSK',  450,  15),
-    ('PRD-014', 'OSK',  320,  10),
-    ('PRD-018', 'OSK', 2800, 200),
-    ('PRD-019', 'OSK',  440,  10),
-    -- 福岡倉庫 (FKO = warehouse_id 3)
-    ('PRD-003', 'FKO',  350,  10),
-    ('PRD-006', 'FKO',  680,  30),
-    ('PRD-007', 'FKO',  120,   5),  -- 発注点割れ (300)
-    ('PRD-008', 'FKO', 1600,  80),
-    ('PRD-011', 'FKO',  280,  10),
-    ('PRD-012', 'FKO',  180,   0),  -- 発注点割れ (200)
-    ('PRD-015', 'FKO', 1180,  40),
-    ('PRD-019', 'FKO',  310,  15),
-    ('PRD-020', 'FKO',  150,   5)
+    -- East Warehouse (WH-E = warehouse_id 1)
+    ('PRD-001', 'WH-E', 1250,  30),
+    ('PRD-002', 'WH-E', 3400, 200),
+    ('PRD-004', 'WH-E',  340,  15),
+    ('PRD-005', 'WH-E',   45,   5),  -- below reorder point (50)
+    ('PRD-008', 'WH-E',  280,  10),
+    ('PRD-010', 'WH-E',   75,   0),  -- below reorder point (200)
+    ('PRD-013', 'WH-E',   95,   8),  -- below reorder point (100)
+    ('PRD-015', 'WH-E',  920,  50),
+    ('PRD-016', 'WH-E',  560,  20),
+    ('PRD-017', 'WH-E',  120,   0),  -- below reorder point (300)
+    ('PRD-018', 'WH-E', 2800, 100),
+    ('PRD-020', 'WH-E',   30,   5),  -- below reorder point (100)
+    -- Central Warehouse (WH-C = warehouse_id 2)
+    ('PRD-001', 'WH-C',  480,  20),
+    ('PRD-002', 'WH-C', 1200,  80),
+    ('PRD-003', 'WH-C',  180,   0),  -- below reorder point (400)
+    ('PRD-006', 'WH-C', 2200, 150),
+    ('PRD-009', 'WH-C',  890,  30),
+    ('PRD-011', 'WH-C',  670,  25),
+    ('PRD-012', 'WH-C',  450,  15),
+    ('PRD-014', 'WH-C',  320,  10),
+    ('PRD-018', 'WH-C', 2800, 200),
+    ('PRD-019', 'WH-C',  440,  10),
+    -- West Warehouse (WH-W = warehouse_id 3)
+    ('PRD-003', 'WH-W',  350,  10),
+    ('PRD-006', 'WH-W',  680,  30),
+    ('PRD-007', 'WH-W',  120,   5),  -- below reorder point (300)
+    ('PRD-008', 'WH-W', 1600,  80),
+    ('PRD-011', 'WH-W',  280,  10),
+    ('PRD-012', 'WH-W',  180,   0),  -- below reorder point (200)
+    ('PRD-015', 'WH-W', 1180,  40),
+    ('PRD-019', 'WH-W',  310,  15),
+    ('PRD-020', 'WH-W',  150,   5)
 ) AS v(product_code, warehouse_code, quantity, reserved)
 INNER JOIN products p ON p.product_code = v.product_code
 INNER JOIN warehouses w ON w.warehouse_code = v.warehouse_code;

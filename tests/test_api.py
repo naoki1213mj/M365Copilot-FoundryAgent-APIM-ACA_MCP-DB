@@ -58,7 +58,7 @@ PRODUCT_COLS = [
     "supplier",
     "is_active",
 ]
-SAMPLE_PRODUCT = ("PRD-001", "収納ボックス 3段", "収納", 2980.0, 500, "アイリスオーヤマ", True)
+SAMPLE_PRODUCT = ("PRD-001", "Wireless Mouse", "Electronics", 2980.0, 500, "Supplier-A", True)
 
 
 class TestProducts:
@@ -84,7 +84,7 @@ class TestProducts:
         mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
 
-        resp = client.get("/products?category=収納")
+        resp = client.get("/products?category=Electronics")
         assert resp.status_code == 200
 
     @patch("main.get_db")
@@ -130,10 +130,10 @@ INVENTORY_COLS = [
 ]
 SAMPLE_INVENTORY = (
     "PRD-001",
-    "収納ボックス 3段",
-    "収納",
-    "KWS",
-    "川崎倉庫",
+    "Wireless Mouse",
+    "Electronics",
+    "WH-E",
+    "East Warehouse",
     1250,
     30,
     1220,
@@ -164,7 +164,7 @@ class TestInventory:
         mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
 
-        resp = client.get("/inventory?warehouse_code=KWS&category=収納&low_stock_only=true")
+        resp = client.get("/inventory?warehouse_code=WH-E&category=Electronics&low_stock_only=true")
         assert resp.status_code == 200
 
     def test_limit_validation(self):
@@ -194,17 +194,17 @@ ALERT_COLS = [
 ]
 SAMPLE_ALERT = (
     "PRD-005",
-    "マットレス ダブル",
-    "寝具",
-    "KWS",
-    "川崎倉庫",
+    "27-inch Monitor",
+    "Electronics",
+    "WH-E",
+    "East Warehouse",
     45,
     5,
     40,
     50,
     5,
     0.9,
-    "シモンズ",
+    "Supplier-C",
 )
 
 
@@ -252,7 +252,7 @@ WAREHOUSE_COLS = [
     "total_reserved",
     "alert_count",
 ]
-SAMPLE_WAREHOUSE = ("KWS", "川崎倉庫", "関東", 50000, 12, 9630, 443, 3)
+SAMPLE_WAREHOUSE = ("WH-E", "East Warehouse", "East Region", 50000, 12, 9630, 443, 3)
 
 
 class TestWarehouses:
@@ -267,7 +267,7 @@ class TestWarehouses:
         resp = client.get("/warehouses")
         assert resp.status_code == 200
         data = resp.json()
-        assert data[0]["warehouse_code"] == "KWS"
+        assert data[0]["warehouse_code"] == "WH-E"
 
     @patch("main.get_db")
     def test_warehouse_stock(self, mock_get_db):
@@ -282,11 +282,11 @@ class TestWarehouses:
             "needs_reorder",
             "last_updated",
         ]
-        stock_row = ("PRD-001", "収納ボックス 3段", "収納", 1250, 30, 1220, 500, 0, "2026-03-14")
+        stock_row = ("PRD-001", "Wireless Mouse", "Electronics", 1250, 30, 1220, 500, 0, "2026-03-14")
 
         # fetchone (倉庫存在確認) + fetchall (在庫データ)
         cursor = MagicMock()
-        cursor.fetchone.return_value = ("川崎倉庫",)
+        cursor.fetchone.return_value = ("East Warehouse",)
         cursor.description = [(col,) for col in stock_cols]
         cursor.fetchall.return_value = [stock_row]
 
@@ -295,10 +295,10 @@ class TestWarehouses:
         mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
 
-        resp = client.get("/warehouses/KWS/stock")
+        resp = client.get("/warehouses/WH-E/stock")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["warehouse_code"] == "KWS"
+        assert data["warehouse_code"] == "WH-E"
         assert len(data["items"]) == 1
         assert len(data["category_summary"]) == 1
 

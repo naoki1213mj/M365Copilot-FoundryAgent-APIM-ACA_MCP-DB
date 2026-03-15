@@ -2,6 +2,7 @@
 
 APIM MCP Server 経由で在庫 API を呼び出すエージェントを作成する。
 認証の既定経路は project_connection_id（Entra JWT）。fallback として追加ヘッダーも渡せる。
+SDK 2.x では create_version で新バージョンを作成。delete_agent API は非対応。
 """
 
 import json
@@ -9,6 +10,7 @@ import os
 
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import MCPTool, PromptAgentDefinition
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
 
 # --- 設定（環境変数から取得） ---
@@ -22,7 +24,7 @@ APIM_SUBSCRIPTION_KEY = os.environ.get("APIM_SUBSCRIPTION_KEY")
 MCP_HEADERS_JSON = os.environ.get("MCP_HEADERS_JSON")
 
 INSTRUCTIONS = """あなたは在庫管理アシスタントです。
-商品部デリバリー担当者からの問い合わせに対して、MCP ツールを使って在庫データを照会し、日本語で回答します。
+ユーザーからの問い合わせに対して、MCP ツールを使って在庫データを照会し、日本語で回答します。
 
 ルール:
 - 商品を検索する場合 → get-products または get-products-by-code ツールを使う
@@ -59,6 +61,16 @@ if MCP_PROJECT_CONNECTION_ID:
     mcp_tool_kwargs["project_connection_id"] = MCP_PROJECT_CONNECTION_ID
 if mcp_headers:
     mcp_tool_kwargs["headers"] = mcp_headers
+
+# --- 既存エージェントの確認（SDK 2.x は create_version で新バージョン作成、削除不要） ---
+try:
+    existing_versions = list(project_client.agents.list_versions(AGENT_NAME, limit=10))
+    if existing_versions:
+        print(f"既存エージェント検出: {AGENT_NAME} ({len(existing_versions)} versions) → 新バージョン作成")
+except ResourceNotFoundError:
+    pass  # 存在しない場合は新規作成
+except Exception as e:
+    print(f"  既存エージェント確認スキップ: {e}")
 
 agent = project_client.agents.create_version(
     agent_name=AGENT_NAME,

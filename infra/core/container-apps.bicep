@@ -13,6 +13,9 @@ param caSubnetId string
 param sqlServerFqdn string
 param sqlDatabaseName string
 
+@description('Container image. azd deploy が実イメージで上書きする。初回は MCR のプレースホルダーを使用。')
+param containerImage string = ''
+
 var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 var managedEnvironmentName = enableEnterpriseSecurity ? 'cae-ent-${resourceToken}' : 'cae-${resourceToken}'
 var containerAppName = enableEnterpriseSecurity ? 'inventory-api-ent' : 'inventory-api'
@@ -108,7 +111,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'inventory-api'
-          image: '${acrLoginServer}/inventory-api:latest'
+          image: !empty(containerImage) ? containerImage : 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
             { name: 'USE_MANAGED_IDENTITY', value: 'true' }

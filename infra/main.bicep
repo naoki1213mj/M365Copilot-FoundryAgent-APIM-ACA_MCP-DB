@@ -145,6 +145,28 @@ module foundry 'core/foundry.bicep' = {
   }
 }
 
+// --- Azure Portal Dashboard (enterprise only, 自動プロビジョニング) ---
+module portalDashboard 'core/portal-dashboard.bicep' = if (enableEnterpriseSecurity) {
+  scope: rg
+  name: 'portal-dashboard'
+  params: {
+    tags: tags
+    appInsightsId: containerApps.outputs.appInsightsId
+  }
+}
+
+// --- Azure Workbook (enterprise only, インタラクティブ分析) ---
+module workbook 'core/workbook.bicep' = if (enableEnterpriseSecurity) {
+  scope: rg
+  name: 'workbook'
+  params: {
+    location: location
+    tags: tags
+    resourceToken: resourceToken
+    appInsightsId: containerApps.outputs.appInsightsId
+  }
+}
+
 // --- Outputs ---
 output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_CONTAINER_APPS_FQDN string = containerApps.outputs.fqdn

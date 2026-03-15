@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # ---- Stage 2: runtime ----
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gnupg2 curl apt-transport-https \
+        gnupg2 curl apt-transport-https unixodbc libgssapi-krb5-2 \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
         | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \

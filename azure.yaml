@@ -24,15 +24,13 @@ hooks:
     continueOnError: true
     run: |
       # 初回デプロイ時、ACR にイメージがないと Container App が起動失敗する。
-      # MCR からプレースホルダーイメージをインポートして回避する。
+      # ACR が存在すれば MCR からプレースホルダーイメージをインポートする。
+      $rg = azd env get-value AZURE_RESOURCE_GROUP 2>$null
+      if (-not $rg) { $rg = "rg-$(azd env get-value AZURE_ENV_NAME 2>$null)" }
       $acrName = azd env get-value AZURE_ACR_LOGIN_SERVER 2>$null
+      if ($acrName) { $acrName = $acrName.Split('.')[0] }
       if (-not $acrName) {
-        $rg = azd env get-value AZURE_RESOURCE_GROUP 2>$null
-        if ($rg) {
-          $acrName = az resource list -g $rg --resource-type Microsoft.ContainerRegistry/registries --query "[0].name" -o tsv 2>$null
-        }
-      } else {
-        $acrName = $acrName.Split('.')[0]
+        $acrName = az resource list -g $rg --resource-type Microsoft.ContainerRegistry/registries --query "[0].name" -o tsv 2>$null
       }
       if ($acrName) {
         $existing = az acr repository list --name $acrName -o tsv 2>$null
@@ -41,9 +39,26 @@ hooks:
           az acr import --name $acrName --source mcr.microsoft.com/azuredocs/containerapps-helloworld:latest --image inventory-api:latest 2>$null
         }
       }
+  predeploy:
+    shell: pwsh
+    continueOnError: true
+    run: |
+      # provision 完了後、deploy 前に ACR イメージを確認・インポート
+      $rg = azd env get-value AZURE_RESOURCE_GROUP 2>$null
+      $acrName = az resource list -g $rg --resource-type Microsoft.ContainerRegistry/registries --query "[0].name" -o tsv 2>$null
+      if ($acrName) {
+        $existing = az acr repository list --name $acrName -o tsv 2>$null
+        if (-not $existing) {
+          Write-Host "Importing placeholder image to ACR: $acrName (predeploy)"
+          az acr import --name $acrName --source mcr.microsoft.com/azuredocs/containerapps-helloworld:latest --image inventory-api:latest 2>$null
+        }
+      }
   postprovision:
     shell: pwsh
     continueOnError: true
     run: |
       $pythonCmd = if (Test-Path "$PSScriptRoot/.venv/Scripts/python.exe") { "$PSScriptRoot/.venv/Scripts/python.exe" } elseif (Test-Path "$PSScriptRoot/.venv/bin/python") { "$PSScriptRoot/.venv/bin/python" } else { "python" }
+      # USE_AI_GATEWAY を azd env から読み込み（未設定時は true）
+      $useGw = azd env get-value USE_AI_GATEWAY 2>$null
+      if ($useGw) { $env:USE_AI_GATEWAY = $useGw }
       & $pythonCmd $PSScriptRoot/scripts/postprovision.py

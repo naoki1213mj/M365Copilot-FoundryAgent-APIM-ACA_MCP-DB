@@ -126,7 +126,7 @@ def _row_to_dict(cursor, row) -> dict:
     response_description="商品情報のリスト",
 )
 def list_products(
-    category: str | None = Query(None, description="カテゴリで絞り込み（例: 寝具、キッチン）"),
+    category: str | None = Query(None, description="カテゴリで絞り込み（例: Electronics, Office Supplies）"),
     limit: int = Query(100, ge=1, le=500, description="最大取得件数"),
 ):
     with get_db() as conn:
@@ -174,8 +174,8 @@ def get_product_by_code(code: str):
     response_description="在庫情報のリスト",
 )
 def list_inventory(
-    warehouse_code: str | None = Query(None, description="倉庫コード（例: KWS, OSK, FKO）"),
-    category: str | None = Query(None, description="カテゴリ（例: 寝具）"),
+    warehouse_code: str | None = Query(None, description="倉庫コード（例: WH-E, WH-C, WH-W）"),
+    category: str | None = Query(None, description="カテゴリ（例: Electronics）"),
     low_stock_only: bool = Query(False, description="true で発注点割れの商品だけ返す"),
     limit: int = Query(100, ge=1, le=500, description="最大取得件数"),
 ):
@@ -278,7 +278,7 @@ def list_warehouses():
 @app.get(
     "/warehouses/{code}/stock",
     summary="特定倉庫の在庫詳細を取得する",
-    description=("指定した倉庫コード（例: KWS）の全在庫をカテゴリ別サマリ付きで返します。"),
+    description="指定した倉庫コード（例: WH-E）の全在庫をカテゴリ別サマリ付きで返します。",
     response_description="倉庫別在庫詳細",
 )
 def get_warehouse_stock(

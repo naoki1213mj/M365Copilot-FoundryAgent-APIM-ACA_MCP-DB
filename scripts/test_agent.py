@@ -26,7 +26,7 @@ if not AGENT_VERSION:
     print(f"最新バージョン自動取得: {AGENT_NAME}:{AGENT_VERSION}")
 
 # テストクエリ
-test_query = "川崎倉庫で発注点割れしている商品を教えて"
+test_query = "East Warehouse で発注点割れしている商品を教えて"
 print(f"質問: {test_query}")
 print("-" * 50)
 
