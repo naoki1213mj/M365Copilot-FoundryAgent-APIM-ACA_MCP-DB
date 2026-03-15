@@ -97,7 +97,7 @@
 - `ENTRA_APP_CLIENT_ID`: MCP policy の audience 検証用 Entra App ID。postprovision が権限があれば自動登録する。
 - `MCP_PROJECT_CONNECTION_ID`: Foundry の RemoteTool project connection 名。ProjectManagedIdentity 認証で Entra JWT を送る正式経路。
 - `ALERT_EMAIL_ADDRESS`: KQL アラート通知先メールアドレス。
-- `USE_AI_GATEWAY`: `true`（デフォルト）で APIM を AI Gateway として Foundry に接続。`false` で従来の RemoteTool connection のみ。
+- `USE_AI_GATEWAY`: `true`（デフォルト）で APIM を AI Gateway として Foundry に接続。`false` で MCP Only（RemoteTool connection のみ）。
 
 ## デモ説明で使うポイント
 
@@ -111,7 +111,7 @@
 
 ## まだ残る手動工程
 
-- APIM の MCP server 自体の作成（ARM API 未対応、AI Gateway / 従来経路両方で必要）
+- APIM の MCP server 自体の作成（ARM API 未対応、AI Gateway / MCP Only 両方で必要）
 - Foundry ポータルからM365 Copilot への publish
 - 新しい Foundry publish を追加した場合の client app id 登録
 - GitHub Actions deploy ジョブ用の Federated Credentials 設定
