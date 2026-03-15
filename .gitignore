@@ -25,6 +25,7 @@ openapi-export.json
 
 # Zenn 記事・カスタム命令（ローカル専用、リポジトリ非公開）
 articles/
+images/
 package.json
 .prettierignore
 AGENTS.md
@@ -34,3 +35,6 @@ AGENTS.md
 .github/prompts/
 .github/skills/
 infra/main.json
+
+# Draw.io / アーキテクチャ図（ローカル専用）
+docs/*.drawio
