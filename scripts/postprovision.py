@@ -468,6 +468,57 @@ def step7_connections(
     _cleanup(mcp_file)
     print("  RemoteTool 接続作成: inventory-mcp-connection (PMI)")
 
+    # --- App Insights 接続（Tracing + Monitor 用、1 プロジェクトに 1 つまで） ---
+    appi_resource_id = run(
+        f"az resource list -g {rg} --resource-type Microsoft.Insights/components "
+        f"--query \"[?contains(name, 'apim')].id | [0]\" -o tsv",
+        check=False,
+    )
+    if appi_resource_id:
+        # 既存の AppInsights 接続を確認（1 プロジェクト 1 接続制限）
+        existing_appi = run(
+            f'az rest --method get --url "{base_url}?api-version={api_version}" '
+            f"--query \"value[?properties.category=='AppInsights'].name | [0]\" -o tsv",
+            check=False,
+        )
+        if existing_appi:
+            print(f"  App Insights 接続 既存: {existing_appi}")
+        else:
+            appi_name = appi_resource_id.split("/")[-1]
+            appi_conn_name = f"{appi_name}-tracing"
+            appi_ikey = run(
+                f"az monitor app-insights component show --app {appi_name} -g {rg} "
+                f"--query instrumentationKey -o tsv",
+                check=False,
+            )
+            if appi_ikey:
+                appi_body = {
+                    "properties": {
+                        "authType": "ApiKey",
+                        "category": "AppInsights",
+                        "target": appi_resource_id,
+                        "isSharedToAll": True,
+                        "group": "ServicesAndApps",
+                        "credentials": {"key": appi_ikey},
+                        "metadata": {
+                            "ApiType": "Azure",
+                            "ResourceId": appi_resource_id,
+                        },
+                    }
+                }
+                appi_file = _write_json(appi_body, "appi-conn.json")
+                appi_url = f"{base_url}/{appi_conn_name}?api-version={api_version}"
+                run(
+                    f'az rest --method put --url "{appi_url}" '
+                    f'--headers "Content-Type=application/json" '
+                    f'--body "@{appi_file}" -o none',
+                    check=False,
+                )
+                _cleanup(appi_file)
+                print(f"  App Insights 接続作成: {appi_conn_name} (Tracing + Monitor)")
+            else:
+                print("  App Insights IKey 取得失敗（Tracing 接続スキップ）")
+
 
 def step8_mcp_policy(apim_name: str, rg: str, sub: str, entra_app_id: str) -> None:
     """[8/11] MCP policy 適用（MCP Server 存在時のみ）。"""
